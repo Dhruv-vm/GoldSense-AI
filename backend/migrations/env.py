@@ -20,7 +20,7 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 from app.db.base import Base
 from app.models.gold_rate import GoldRate
-
+from app.models.market_rate import MarketRate
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
