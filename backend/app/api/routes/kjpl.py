@@ -40,3 +40,34 @@ def get_latest_kjpl_rate():
 
     finally:
         db.close()
+
+
+@router.get("/history")
+def get_kjpl_history(limit: int = 100):
+    db = SessionLocal()
+
+    try:
+        result = db.execute(
+            select(GoldRate)
+            .order_by(GoldRate.observed_at.desc())
+            .limit(min(limit, 500))
+        )
+
+        rates = result.scalars().all()
+
+        return [
+            {
+                "id": rate.id,
+                "gold_mjdta": rate.gold_mjdta,
+                "gold_with_gst": rate.gold_with_gst,
+                "silver_mjdta": rate.silver_mjdta,
+                "source_updated_time": rate.source_updated_time,
+                "observed_at": rate.observed_at,
+                "currency": rate.currency,
+                "unit": rate.unit,
+            }
+            for rate in rates
+        ]
+
+    finally:
+        db.close()
