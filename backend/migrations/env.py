@@ -21,6 +21,8 @@ if config.config_file_name is not None:
 from app.db.base import Base
 from app.models.gold_rate import GoldRate
 from app.models.market_rate import MarketRate
+from app.models.prediction import Prediction
+from app.models.feature_snapshot import FeatureSnapshot
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

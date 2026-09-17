@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -11,6 +12,8 @@ class KJPLRate(BaseModel):
     gold_with_gst: float | None = Field(default=None, gt=0)
 
     source_updated_time: str | None = None
+    source_updated_at: datetime | None = None
+
     observed_at: datetime
 
     currency: str = "INR"

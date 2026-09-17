@@ -18,6 +18,10 @@ class GoldRate(Base):
 
     source_updated_time: Mapped[str | None] = mapped_column(String(50))
 
+    source_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+    )
+
     observed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

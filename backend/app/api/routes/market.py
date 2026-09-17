@@ -1,3 +1,4 @@
+from app.jobs.scheduler import scheduler
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 
@@ -70,3 +71,17 @@ def get_market_history(limit: int = 100):
 
     finally:
         db.close()
+@router.get("/scheduler")
+def get_scheduler_status():
+    jobs = scheduler.get_jobs()
+
+    return {
+        "running": scheduler.running,
+        "jobs": [
+            {
+                "id": job.id,
+                "next_run_time": job.next_run_time,
+            }
+            for job in jobs
+        ],
+    }
