@@ -1,0 +1,47 @@
+name: KJPL Rate Collector
+
+on:
+  schedule:
+    - cron: '0 11 * * *'
+      timezone: 'Asia/Kolkata'
+    - cron: '0 18 * * *'
+      timezone: 'Asia/Kolkata'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  collect-kjpl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests beautifulsoup4
+
+      - name: Collect KJPL rate
+        run: python scripts/collect_kjpl_csv.py
+
+      - name: Commit collected data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/kjpl/kjpl_rates.csv
+
+          if git diff --cached --quiet; then
+            echo "No new KJPL data to commit."
+          else
+            git commit -m "data: collect KJPL rate"
+            git push
+          fi
