@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from app.api.routes.kjpl import router as kjpl_router
 from app.api.routes.market import router as market_router
+from app.api.routes.prediction import router as prediction_router
 from app.jobs.scheduler import start_scheduler, stop_scheduler
 
 
@@ -22,6 +23,7 @@ app = FastAPI(
 
 app.include_router(kjpl_router)
 app.include_router(market_router)
+app.include_router(prediction_router)
 
 
 @app.get("/health")
