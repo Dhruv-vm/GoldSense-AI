@@ -18,18 +18,21 @@ SYMBOLS = {
 }
 
 
-def get_latest_close(symbol: str) -> float:
+def get_latest_intraday_close(symbol: str) -> float:
     ticker = yf.Ticker(symbol)
 
-    history = ticker.history(period="5d")
+    history = ticker.history(
+        period="2d",
+        interval="15m",
+    )
 
     if history.empty:
-        raise RuntimeError(f"No market data returned for {symbol}")
+        raise RuntimeError(f"No intraday data returned for {symbol}")
 
     closes = history["Close"].dropna()
 
     if closes.empty:
-        raise RuntimeError(f"No valid close price for {symbol}")
+        raise RuntimeError(f"No valid intraday close for {symbol}")
 
     return float(closes.iloc[-1])
 
@@ -38,7 +41,7 @@ def collect() -> None:
     observed_at = datetime.now(IST)
 
     values = {
-        name: get_latest_close(symbol)
+        name: get_latest_intraday_close(symbol)
         for name, symbol in SYMBOLS.items()
     }
 
