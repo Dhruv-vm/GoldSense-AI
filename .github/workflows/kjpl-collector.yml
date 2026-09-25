@@ -2,10 +2,17 @@ name: KJPL Rate Collector
 
 on:
   schedule:
-    - cron: '0 11 * * *'
-      timezone: 'Asia/Kolkata'
-    - cron: '0 18 * * *'
-      timezone: 'Asia/Kolkata'
+    # Morning window: 9:30 AM - 11:00 AM IST
+    # IST = UTC + 5:30
+    - cron: '30,45 3 * * *'
+    - cron: '0,15,30,45 4 * * *'
+    - cron: '0 5 * * *'
+
+    # Evening window: 5:30 PM - 7:00 PM IST
+    - cron: '30,45 11 * * *'
+    - cron: '0,15,30,45 12 * * *'
+    - cron: '0 13 * * *'
+
   workflow_dispatch:
 
 permissions:
