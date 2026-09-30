@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests beautifulsoup4 pydantic
+          pip install requests beautifulsoup4 pydantic lxml
 
       - name: Collect news data
         env:
@@ -43,5 +43,6 @@ jobs:
             echo "No new news data to commit."
           else
             git commit -m "data: collect news articles"
-            git push
+            git pull --rebase origin develop
+            git push origin develop
           fi

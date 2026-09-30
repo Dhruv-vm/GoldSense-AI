@@ -339,7 +339,10 @@ class NewsClient:
             print(f"[NEWS] RSS fallback request failed: {exc}")
             return []
 
-        soup = BeautifulSoup(response.text, "xml")
+        try:
+            soup = BeautifulSoup(response.text, "xml")
+        except Exception:
+            soup = BeautifulSoup(response.text, "html.parser")
         items = soup.find_all("item")
 
         articles: list[NewsArticle] = []
