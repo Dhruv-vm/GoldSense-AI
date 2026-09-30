@@ -6,9 +6,13 @@ import pandas as pd
 import xgboost as xgb
 
 
-DATASET_PATH = Path("ml/data/processed/gold_training_dataset.csv")
-MODEL_DIR = Path("ml/models")
+DATASET_PATH = (
+    Path("backend/ml/data/processed/gold_training_dataset.csv")
+    if Path("backend/ml/data/processed/gold_training_dataset.csv").exists()
+    else Path("ml/data/processed/gold_training_dataset.csv")
+)
 
+MODEL_DIR = Path("backend/ml/models") if Path("backend/ml/models").exists() else Path("ml/models")
 MIN_ROWS = 50
 
 FEATURE_COLUMNS = [
