@@ -3,13 +3,15 @@ name: KJPL Rate Collector
 on:
   schedule:
     # All times in UTC (IST = UTC + 5:30)
-    # Morning window: 11:00 AM IST (05:30 UTC) & follow-up at 11:30 AM IST (06:00 UTC)
-    - cron: '30 5 * * *'
-    - cron: '0 6 * * *'
+    # Morning collection window (Primary: 11:00 AM IST)
+    - cron: '0 5 * * *'    # 10:30 AM IST (Morning early backup)
+    - cron: '30 5 * * *'   # 11:00 AM IST (Morning primary)
+    - cron: '0 6 * * *'    # 11:30 AM IST (Morning late backup)
 
-    # Evening window: 6:30 PM IST (13:00 UTC) & follow-up at 7:00 PM IST (13:30 UTC)
-    - cron: '0 13 * * *'
-    - cron: '30 13 * * *'
+    # Evening collection window (Primary: 6:00 PM IST)
+    - cron: '0 12 * * *'   # 05:30 PM IST (Evening early backup)
+    - cron: '30 12 * * *'  # 06:00 PM IST (Evening primary)
+    - cron: '0 13 * * *'   # 06:30 PM IST (Evening late backup)
 
   workflow_dispatch:
 
@@ -45,7 +47,7 @@ jobs:
           git add data/kjpl/kjpl_rates.csv
 
           if git diff --cached --quiet; then
-            echo "No new KJPL data to commit."
+            echo "[KJPL WORKFLOW] No new KJPL data to commit."
           else
             git commit -m "data: collect KJPL rate"
             git pull --rebase origin develop
