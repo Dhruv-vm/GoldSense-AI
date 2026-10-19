@@ -133,12 +133,12 @@ def test_kjpl_workflow_yaml_and_cron_conversions():
     crons = [s["cron"] for s in schedules]
 
     expected_crons = [
-        "53 4 * * *",  # 10:23 AM IST (Morning early backup)
-        "23 5 * * *",  # 10:53 AM IST (Morning primary)
-        "51 5 * * *",  # 11:21 AM IST (Morning late backup)
-        "53 11 * * *", # 05:23 PM IST (Evening early backup)
-        "23 12 * * *", # 05:53 PM IST (Evening primary)
-        "53 12 * * *", # 06:23 PM IST (Evening late backup)
+        "38 0 * * *",  # 06:08 AM IST (targets ~10:15 - 10:30 AM IST after ~4h queue backlog)
+        "8 1 * * *",   # 06:38 AM IST (targets ~10:45 - 11:00 AM IST after ~4h queue backlog)
+        "38 1 * * *",  # 07:08 AM IST (targets ~11:15 - 11:30 AM IST after ~4h queue backlog)
+        "8 9 * * *",   # 02:38 PM IST (targets ~05:15 - 05:40 PM IST after ~3h queue backlog)
+        "38 9 * * *",  # 03:08 PM IST (targets ~05:45 - 06:10 PM IST after ~3h queue backlog)
+        "8 10 * * *",  # 03:38 PM IST (targets ~06:15 - 06:40 PM IST after ~3h queue backlog)
     ]
 
     assert crons == expected_crons, f"Crons must match required 6 schedules: {crons}"
@@ -149,18 +149,18 @@ def test_kjpl_workflow_yaml_and_cron_conversions():
         utc_time = datetime(2026, 10, 14, int(hour_str), int(minute_str), tzinfo=timezone.utc)
         ist_time = utc_time.astimezone(IST)
 
-        if cron_expr == "53 4 * * *":
-            assert ist_time.strftime("%I:%M %p") == "10:23 AM"
-        elif cron_expr == "23 5 * * *":
-            assert ist_time.strftime("%I:%M %p") == "10:53 AM"
-        elif cron_expr == "51 5 * * *":
-            assert ist_time.strftime("%I:%M %p") == "11:21 AM"
-        elif cron_expr == "53 11 * * *":
-            assert ist_time.strftime("%I:%M %p") == "05:23 PM"
-        elif cron_expr == "23 12 * * *":
-            assert ist_time.strftime("%I:%M %p") == "05:53 PM"
-        elif cron_expr == "53 12 * * *":
-            assert ist_time.strftime("%I:%M %p") == "06:23 PM"
+        if cron_expr == "38 0 * * *":
+            assert ist_time.strftime("%I:%M %p") == "06:08 AM"
+        elif cron_expr == "8 1 * * *":
+            assert ist_time.strftime("%I:%M %p") == "06:38 AM"
+        elif cron_expr == "38 1 * * *":
+            assert ist_time.strftime("%I:%M %p") == "07:08 AM"
+        elif cron_expr == "8 9 * * *":
+            assert ist_time.strftime("%I:%M %p") == "02:38 PM"
+        elif cron_expr == "38 9 * * *":
+            assert ist_time.strftime("%I:%M %p") == "03:08 PM"
+        elif cron_expr == "8 10 * * *":
+            assert ist_time.strftime("%I:%M %p") == "03:38 PM"
 
 
 def test_collect_with_mocked_response(tmp_path: Path, monkeypatch):

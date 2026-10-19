@@ -3,16 +3,22 @@ name: KJPL Rate Collector
 on:
   schedule:
     # All times in UTC (IST = UTC + 5:30)
-    # Off-peak minutes (:23, :51, :53) avoid GitHub's platform-wide :00 and :30 queue traffic jams.
-    # Morning collection window (~10:23 AM - 11:21 AM IST)
-    - cron: '53 4 * * *'   # 10:23 AM IST (Morning early backup)
-    - cron: '23 5 * * *'   # 10:53 AM IST (Morning primary)
-    - cron: '51 5 * * *'   # 11:21 AM IST (Morning late backup)
+    # GitHub Actions public runner schedule queue experiences an empirical ~4-hour backlog
+    # in the morning and ~3-hour backlog in the afternoon.
+    # We pre-shift the crons by the measured queue backlog and use off-peak minutes (:08, :38)
+    # so that actual runner execution lands precisely within the target market publication windows:
+    #   Morning Window : ~10:15 AM - 11:30 AM IST (KJPL morning rate published ~09:30-10:00 AM)
+    #   Evening Window : ~05:15 PM - 06:30 PM IST (KJPL evening rate published ~04:30-05:30 PM)
 
-    # Evening collection window (~05:23 PM - 06:23 PM IST)
-    - cron: '53 11 * * *'  # 05:23 PM IST (Evening early backup)
-    - cron: '23 12 * * *'  # 05:53 PM IST (Evening primary)
-    - cron: '53 12 * * *'  # 06:23 PM IST (Evening late backup)
+    # Morning target window (~10:15 AM - 11:30 AM IST) - pre-shifted by ~4h:
+    - cron: '38 0 * * *'   # 06:08 AM IST scheduled -> executes ~10:15 - 10:30 AM IST (Morning early backup)
+    - cron: '8 1 * * *'    # 06:38 AM IST scheduled -> executes ~10:45 - 11:00 AM IST (Morning primary)
+    - cron: '38 1 * * *'   # 07:08 AM IST scheduled -> executes ~11:15 - 11:30 AM IST (Morning late backup)
+
+    # Evening target window (~05:15 PM - 06:30 PM IST) - pre-shifted by ~3h:
+    - cron: '8 9 * * *'    # 02:38 PM IST scheduled -> executes ~05:15 - 05:40 PM IST (Evening early backup)
+    - cron: '38 9 * * *'   # 03:08 PM IST scheduled -> executes ~05:45 - 06:10 PM IST (Evening primary)
+    - cron: '8 10 * * *'   # 03:38 PM IST scheduled -> executes ~06:15 - 06:40 PM IST (Evening late backup)
 
   workflow_dispatch:
 
