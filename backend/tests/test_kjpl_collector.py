@@ -120,6 +120,8 @@ def test_check_event_status_new_day_not_blocked_by_ancient_history(tmp_path: Pat
 
 def test_kjpl_workflow_yaml_and_cron_conversions():
     workflow_path = Path(".github/workflows/kjpl-collector.yml")
+    if not workflow_path.exists():
+        workflow_path = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "kjpl-collector.yml"
     assert workflow_path.exists(), "Workflow file must exist"
 
     with workflow_path.open("r", encoding="utf-8") as f:

@@ -10,8 +10,10 @@ def test_processed_dataset_integrity():
     assert DATASET_PATH.exists(), f"Dataset not found at {DATASET_PATH}"
     df = pd.read_csv(DATASET_PATH)
 
-    # 1. Row count: Exactly 10 supervised rows (from 11 KJPL events)
-    assert len(df) == 10
+    # 1. Row count: Exactly N-1 supervised rows (from N KJPL events, excluding the last pending event)
+    kjpl_df = pd.read_csv(KJPL_PATH)
+    assert len(df) == len(kjpl_df) - 1
+    assert len(df) >= 10
 
     # 2. Key targets must be present
     assert "target_change" in df.columns

@@ -19,25 +19,16 @@ FEATURE_COLUMNS = [
     "usdinr",
     "xauusd",
     "xagusd",
-    "gold_return_15m",
-    "xau_return_15m",
-    "xagusd_return_15m",
-    "usdinr_return_15m",
-    "gold_return_1h",
-    "xau_return_1h",
-    "xagusd_return_1h",
-    "usdinr_return_1h",
-    "gold_return_4h",
-    "xau_return_4h",
-    "xagusd_return_4h",
-    "usdinr_return_4h",
-    "gold_return_1d",
-    "xau_return_1d",
-    "xagusd_return_1d",
     "usdinr_return_1d",
-    "gold_xau_inr_estimate",
+    "xauusd_return_1d",
+    "xagusd_return_1d",
+    "gold_global_inr_per_gram",
+    "silver_global_inr_per_gram",
+    "gold_silver_ratio",
+    "kjpl_gold_change_pct",
+    "kjpl_silver_change_pct",
     "kjpl_global_premium_pct",
-    "gold_xau_ratio",
+    "kjpl_global_ratio",
 ]
 
 
@@ -65,7 +56,8 @@ def main() -> None:
     if missing:
         raise RuntimeError(f"Missing feature columns: {missing}")
 
-    df = df.dropna(subset=FEATURE_COLUMNS + ["target_gold", "target_direction"])
+    target_price_col = "next_event_gold" if "next_event_gold" in df.columns else "target_gold"
+    df = df.dropna(subset=FEATURE_COLUMNS + [target_price_col, "target_direction"])
 
     if len(df) < MIN_ROWS:
         print(
@@ -88,8 +80,8 @@ def main() -> None:
     X_train = train_df[FEATURE_COLUMNS]
     X_validation = validation_df[FEATURE_COLUMNS]
 
-    y_train_price = train_df["target_gold"]
-    y_validation_price = validation_df["target_gold"]
+    y_train_price = train_df[target_price_col]
+    y_validation_price = validation_df[target_price_col]
 
     direction_mapping = {"DOWN": 0, "FLAT": 1, "UP": 2}
 

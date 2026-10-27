@@ -22,3 +22,8 @@ backend/ml/data/processed/
 
 # Logs
 *.log
+
+# SQLite databases
+*.db
+*.sqlite3
+data/*.db
