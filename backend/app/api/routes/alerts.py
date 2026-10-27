@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.core.auth import get_current_user
 from app.services.alert_service import AlertService
 
 router = APIRouter(prefix="/api/alerts", tags=["Alerts"])
@@ -16,29 +17,29 @@ class AlertCreateSchema(BaseModel):
 
 
 @router.get("")
-def list_alerts(x_user_id: str = Header(default="default_user", alias="X-User-ID")):
-    return AlertService.list_alerts(user_id=x_user_id)
+def list_alerts(current_user: str = Depends(get_current_user)):
+    return AlertService.list_alerts(user_id=current_user)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_alert(
     payload: AlertCreateSchema,
-    x_user_id: str = Header(default="default_user", alias="X-User-ID"),
+    current_user: str = Depends(get_current_user),
 ):
-    return AlertService.create_alert(payload.model_dump(), user_id=x_user_id)
+    return AlertService.create_alert(payload.model_dump(), user_id=current_user)
 
 
 @router.delete("/{alert_id}")
 def delete_alert(
     alert_id: int,
-    x_user_id: str = Header(default="default_user", alias="X-User-ID"),
+    current_user: str = Depends(get_current_user),
 ):
-    success = AlertService.delete_alert(alert_id, user_id=x_user_id)
+    success = AlertService.delete_alert(alert_id, user_id=current_user)
     if not success:
         raise HTTPException(status_code=404, detail="Alert rule not found.")
     return {"status": "SUCCESS", "message": f"Alert rule {alert_id} deleted."}
 
 
 @router.get("/evaluate")
-def evaluate_alerts(x_user_id: str = Header(default="default_user", alias="X-User-ID")):
-    return AlertService.evaluate_alerts(user_id=x_user_id)
+def evaluate_alerts(current_user: str = Depends(get_current_user)):
+    return AlertService.evaluate_alerts(user_id=current_user)

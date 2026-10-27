@@ -11,8 +11,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Personal Bullion Portfolio Tracker**:
   - SQLAlchemy model `PortfolioHolding` with metal type, gross weight, fine weight, purity, acquisition cost, and tenant `user_id`.
   - Comprehensive `PortfolioService` with gram/kilogram conversion, 999.9/995/916/750 purity math, and real-time market mark-to-market valuation.
-  - REST endpoints at `/api/v1/portfolio` supporting CRUD operations and `X-User-ID` isolation headers.
-  - Interactive portfolio dashboard in frontend terminal with asset breakdown cards, unrealized PnL indicators, and quick-add modal.
+  - REST endpoints at `/api/portfolio` supporting full CRUD (Add, Edit, List, Delete) and historical valuation trajectory (`/history`).
+  - Safe handling of unknown or inherited acquisition costs without distorting unrealized PnL.
+  - Interactive portfolio dashboard in frontend terminal with Edit modal, asset breakdown cards, and historical trajectory table.
+- **Server-Side Authorization & Tenancy**:
+  - `app.core.auth.get_current_user` enforcing Bearer token and X-API-Key verification when `AUTH_ENABLED=true`.
+  - Prevents caller-supplied user ID bypass and protects multi-tenant isolation.
+- **Automated Pipeline & Walk-Forward Evaluation**:
+  - End-to-end pipeline runner `update_pipeline.py` executing cleaning, market feature building, news sync, dataset rebuild, and evaluation in sequence.
+  - Walk-forward baseline evaluation script `walk_forward_evaluation.py` establishing persistence benchmarks (MAE: ₹68.28/g, RMSE: ₹89.05/g).
+  - Trading session status monitor (`get_market_trading_status()`) identifying open, after-hours, and weekend-closed states.
+- **Frontend Dashboard Terminal**:
+  - Enhanced to institutional 8-tab terminal (Overview, Markets, My Bullion, Predictions, News Feed, Research & History, Alerts, Settings).
+  - Next.js 16 (Turbopack) build verified with zero errors.
+- **Test Suite Expansion**:
+  - Expanded backend test suite from 59 to **65 passing pytest tests (100% pass rate)**.
 - **Unified Market Data Service**:
   - `DataService` in `backend/app/services/data_service.py` with CSV fallback, metric conversions (Troy oz to grams, USD/INR conversion), and domestic premium calculations.
   - Debounced manual rate refresh API (`/api/v1/market/refresh`) with a 60-second cooldown window and honest data freshness badges (`FRESH`, `DELAYED`, `STALE`).

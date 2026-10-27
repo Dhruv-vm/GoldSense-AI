@@ -35,6 +35,14 @@ interface DerivedData {
   conversion_factor: number;
 }
 
+interface TradingStatus {
+  indian_physical_market: string;
+  indian_physical_description: string;
+  global_futures_market: string;
+  global_futures_description: string;
+  server_time_ist: string;
+}
+
 interface OverviewResponse {
   status: string;
   timestamp: string;
@@ -42,6 +50,7 @@ interface OverviewResponse {
   market: MarketData;
   derived: DerivedData;
   overall_freshness: string;
+  trading_status?: TradingStatus;
   message?: string;
 }
 
@@ -90,6 +99,16 @@ interface Holding {
   notes: string | null;
 }
 
+interface HistoricalValuation {
+  date: string;
+  observed_at: string;
+  gold_rate_inr: number;
+  silver_rate_inr: number;
+  total_valuation_inr: number;
+  gold_valuation_inr: number;
+  silver_valuation_inr: number;
+}
+
 interface PredictionStatus {
   status: string;
   is_ready: boolean;
@@ -99,14 +118,24 @@ interface PredictionStatus {
     required_samples: number;
     progress_pct: number;
   };
-  current_macro_snapshot?: Record<string, any>;
-  predicted_gold_price?: number;
-  predicted_direction?: string;
-  expected_change_inr?: number;
-  expected_change_pct?: number;
+  baseline_benchmarks?: {
+    naive_persistence?: {
+      description: string;
+      mae_inr_per_g: number;
+      rmse_inr_per_g: number;
+    };
+    sma_3_event?: {
+      description: string;
+      mae_inr_per_g: number;
+      rmse_inr_per_g: number;
+    };
+  };
+  current_macro_snapshot?: any;
+  pipeline_specification?: any;
 }
 
-interface NewsArticle {
+interface NewsItem {
+  id: string;
   title: string;
   url: string;
   source: string;
@@ -114,238 +143,297 @@ interface NewsArticle {
   sentiment_label: string;
   sentiment_score: number;
   is_gold_relevant: boolean;
-  primary_category: string;
+  primary_category?: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+interface AlertRule {
+  id: number;
+  alert_type: string;
+  target_metric: string;
+  threshold: number;
+  notes: string | null;
+  created_at: string;
+}
 
 export default function GoldSenseDashboard() {
-  const [activeTab, setActiveTab] = useState<"overview" | "portfolio" | "predictions" | "news" | "alerts">("overview");
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "markets" | "portfolio" | "predictions" | "news" | "research" | "alerts" | "settings"
+  >("overview");
 
-  // Market overview state
+  // Data states
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
-  const [loadingOverview, setLoadingOverview] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
-
-  // Portfolio state
-  const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
+  const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [loadingPortfolio, setLoadingPortfolio] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
-
-  // Add holding form
-  const [newMetal, setNewMetal] = useState<"GOLD" | "SILVER">("GOLD");
-  const [newProduct, setNewProduct] = useState("");
-  const [newPurity, setNewPurity] = useState(0.999);
-  const [newWeight, setNewWeight] = useState(10.0);
-  const [newUnit, setNewUnit] = useState<"g" | "kg">("g");
-  const [newQuantity, setNewQuantity] = useState(1);
-  const [newCost, setNewCost] = useState("");
-  const [newDate, setNewDate] = useState("");
-  const [newNotes, setNewNotes] = useState("");
-
-  // Predictions state
+  const [portfolioHistory, setPortfolioHistory] = useState<HistoricalValuation[]>([]);
   const [prediction, setPrediction] = useState<PredictionStatus | null>(null);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [alerts, setAlerts] = useState<AlertRule[]>([]);
 
-  // News state
-  const [news, setNews] = useState<NewsArticle[]>([]);
+  // UI / Status states
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
+  const [newsFilter, setNewsFilter] = useState("ALL");
+  const [userId, setUserId] = useState("owner");
+  const [apiKey, setApiKey] = useState("");
 
-  // Alerts state
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [newAlertThreshold, setNewAlertThreshold] = useState("13500");
-  const [newAlertType, setNewAlertType] = useState("PRICE_ABOVE");
+  // Modals
+  const [isAddHoldingOpen, setIsAddHoldingOpen] = useState(false);
+  const [isEditHoldingOpen, setIsEditHoldingOpen] = useState(false);
+  const [editingHolding, setEditingHolding] = useState<Holding | null>(null);
+  const [isAddAlertOpen, setIsAddAlertOpen] = useState(false);
 
-  // Load initial market overview
-  useEffect(() => {
-    fetchOverview();
-    fetchPortfolio();
-    fetchPredictions();
-    fetchNews();
-    fetchAlerts();
-  }, []);
+  // Form states
+  const [holdingForm, setHoldingForm] = useState({
+    metal_type: "GOLD",
+    product_name: "24K Minted Bar",
+    purity: "0.999",
+    gross_weight: "10.0",
+    weight_unit: "g",
+    quantity: "1",
+    acquisition_date: new Date().toISOString().split("T")[0],
+    acquisition_cost_inr: "",
+    notes: "Personal Vault",
+  });
 
-  const fetchOverview = async () => {
+  const [alertForm, setAlertForm] = useState({
+    alert_type: "PRICE_ABOVE",
+    target_metric: "KJPL_GOLD",
+    threshold: "14500",
+    notes: "",
+  });
+
+  const getHeaders = () => {
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (userId) h["X-User-ID"] = userId;
+    if (apiKey) h["Authorization"] = `Bearer ${apiKey}`;
+    return h;
+  };
+
+  const fetchData = async () => {
+    setIsLoading(true);
     try {
-      setLoadingOverview(true);
-      const res = await fetch(`${API_BASE}/api/market/overview`);
-      if (res.ok) {
-        const data = await res.json();
-        setOverview(data);
+      const headers = getHeaders();
+
+      // 1. Overview
+      const ovRes = await fetch("/api/v1/market/overview");
+      if (ovRes.ok) {
+        const ovJson = await ovRes.json();
+        setOverview(ovJson);
       }
-    } catch {
-      // Fallback preview data if backend server is not currently running locally
-      setOverview({
-        status: "OFFLINE_FALLBACK",
-        timestamp: new Date().toISOString(),
-        kjpl: {
-          source: "KJPL (MJDTA Benchmark)",
-          gold_mjdta: 13135.0,
-          silver_mjdta: 220.0,
-          published_time: "Time : 09:42 am",
-          observed_at: new Date().toISOString(),
-          change_24h_inr: 50.0,
-          change_24h_pct: 0.38,
-          freshness: "FRESH",
-        },
-        market: {
-          xauusd: 4021.7,
-          xagusd: 53.45,
-          usdinr: 95.2,
-          observed_at: new Date().toISOString(),
-          source: "Yahoo Finance (COMEX & Forex)",
-          xauusd_change_24h: 12.5,
-          xauusd_change_24h_pct: 0.31,
-          usdinr_change_24h: 0.05,
-          freshness: "FRESH",
-        },
-        derived: {
-          global_gold_inr_per_gram: 12309.1,
-          global_silver_inr_per_gram: 163.58,
-          domestic_premium_inr_per_gram: 825.9,
-          domestic_premium_pct: 6.71,
-          global_gold_silver_ratio: 75.25,
-          domestic_gold_silver_ratio: 59.7,
-          conversion_factor: 31.1034768,
-        },
-        overall_freshness: "FRESH",
-      });
-    } finally {
-      setLoadingOverview(false);
-    }
-  };
 
-  const handleManualRefresh = async () => {
-    try {
-      setRefreshing(true);
-      setRefreshMessage("Checking live feeds...");
-      const res = await fetch(`${API_BASE}/api/market/refresh`, { method: "POST" });
-      if (res.ok) {
-        const data = await res.json();
-        setOverview(data);
-        setRefreshMessage(data.message || "Market data refreshed.");
-      } else {
-        setRefreshMessage("Refresh rate limit reached or backend unavailable.");
+      // 2. Portfolio Summary
+      const pfRes = await fetch("/api/portfolio/summary", { headers });
+      if (pfRes.ok) {
+        const pfJson = await pfRes.json();
+        setPortfolioSummary(pfJson);
       }
-    } catch (e: any) {
-      setRefreshMessage("Could not contact backend server.");
-    } finally {
-      setRefreshing(false);
-      setTimeout(() => setRefreshMessage(null), 5000);
-    }
-  };
 
-  const fetchPortfolio = async () => {
-    try {
-      setLoadingPortfolio(true);
-      const [resSum, resHold] = await Promise.all([
-        fetch(`${API_BASE}/api/portfolio/summary`),
-        fetch(`${API_BASE}/api/portfolio/holdings`),
-      ]);
-      if (resSum.ok) setPortfolio(await resSum.json());
-      if (resHold.ok) setHoldings(await resHold.json());
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingPortfolio(false);
-    }
-  };
+      // 3. Holdings
+      const hldRes = await fetch("/api/portfolio/holdings", { headers });
+      if (hldRes.ok) {
+        const hldJson = await hldRes.json();
+        setHoldings(hldJson);
+      }
 
-  const handleAddHolding = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_BASE}/api/portfolio/holdings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          metal_type: newMetal,
-          product_name: newProduct || (newMetal === "GOLD" ? "24K Gold Bar" : "999 Silver Cast Bar"),
-          purity: Number(newPurity),
-          gross_weight: Number(newWeight),
-          weight_unit: newUnit,
-          quantity: Number(newQuantity),
-          acquisition_cost_inr: newCost ? Number(newCost) : null,
-          acquisition_date: newDate || null,
-          notes: newNotes || null,
-        }),
-      });
-      if (res.ok) {
-        setShowAddModal(false);
-        fetchPortfolio();
+      // 4. Portfolio History
+      const histRes = await fetch("/api/portfolio/history", { headers });
+      if (histRes.ok) {
+        const histJson = await histRes.json();
+        setPortfolioHistory(histJson);
+      }
+
+      // 5. Prediction Status
+      const predRes = await fetch("/api/v1/prediction/latest");
+      if (predRes.ok) {
+        const predJson = await predRes.json();
+        setPrediction(predJson);
+      }
+
+      // 6. News
+      const newsRes = await fetch("/api/v1/news?limit=25");
+      if (newsRes.ok) {
+        const newsJson = await newsRes.json();
+        setNews(newsJson.articles || []);
+      }
+
+      // 7. Alerts
+      const alRes = await fetch("/api/alerts", { headers });
+      if (alRes.ok) {
+        const alJson = await alRes.json();
+        setAlerts(alJson);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Failed fetching dashboard data", err);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [userId, apiKey]);
+
+  const handleRefreshRates = async () => {
+    setIsRefreshing(true);
+    setRefreshNotice(null);
+    try {
+      const res = await fetch("/api/v1/market/refresh", { credentials: "omit" });
+      const data = await res.json();
+      if (res.status === 429) {
+        setRefreshNotice(data.detail?.message || "Rate limit cooldown active (60s). Retaining latest observations.");
+      } else if (res.ok) {
+        setOverview(data);
+        setRefreshNotice("Market rates successfully updated.");
+      }
+    } catch (e) {
+      setRefreshNotice("Refresh request failed. Retaining last-known-good rates.");
+    } finally {
+      setIsRefreshing(false);
+      setTimeout(() => setRefreshNotice(null), 5000);
+    }
+  };
+
+  const handleCreateHolding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        metal_type: holdingForm.metal_type,
+        product_name: holdingForm.product_name,
+        purity: parseFloat(holdingForm.purity),
+        gross_weight: parseFloat(holdingForm.gross_weight),
+        weight_unit: holdingForm.weight_unit,
+        quantity: parseInt(holdingForm.quantity, 10),
+        acquisition_date: holdingForm.acquisition_date || null,
+        acquisition_cost_inr: holdingForm.acquisition_cost_inr ? parseFloat(holdingForm.acquisition_cost_inr) : null,
+        notes: holdingForm.notes,
+      };
+
+      const res = await fetch("/api/portfolio/holdings", {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setIsAddHoldingOpen(false);
+        fetchData();
+      }
+    } catch (err) {
+      console.error("Error creating holding", err);
+    }
+  };
+
+  const handleUpdateHolding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingHolding) return;
+    try {
+      const payload = {
+        metal_type: holdingForm.metal_type,
+        product_name: holdingForm.product_name,
+        purity: parseFloat(holdingForm.purity),
+        gross_weight: parseFloat(holdingForm.gross_weight),
+        weight_unit: holdingForm.weight_unit,
+        quantity: parseInt(holdingForm.quantity, 10),
+        acquisition_date: holdingForm.acquisition_date || null,
+        acquisition_cost_inr: holdingForm.acquisition_cost_inr ? parseFloat(holdingForm.acquisition_cost_inr) : null,
+        notes: holdingForm.notes,
+      };
+
+      const res = await fetch(`/api/portfolio/holdings/${editingHolding.id}`, {
+        method: "PUT",
+        headers: getHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setIsEditHoldingOpen(false);
+        setEditingHolding(null);
+        fetchData();
+      }
+    } catch (err) {
+      console.error("Error updating holding", err);
+    }
+  };
+
+  const openEditModal = (h: Holding) => {
+    setEditingHolding(h);
+    setHoldingForm({
+      metal_type: h.metal_type,
+      product_name: h.product_name,
+      purity: String(h.purity),
+      gross_weight: String(h.gross_weight_grams),
+      weight_unit: "g",
+      quantity: String(h.quantity),
+      acquisition_date: h.acquisition_date || "",
+      acquisition_cost_inr: h.acquisition_cost_inr !== null ? String(h.acquisition_cost_inr) : "",
+      notes: h.notes || "",
+    });
+    setIsEditHoldingOpen(true);
   };
 
   const handleDeleteHolding = async (id: number) => {
+    if (!confirm("Are you sure you want to remove this holding?")) return;
     try {
-      const res = await fetch(`${API_BASE}/api/portfolio/holdings/${id}`, { method: "DELETE" });
-      if (res.ok) fetchPortfolio();
+      const res = await fetch(`/api/portfolio/holdings/${id}`, {
+        method: "DELETE",
+        headers: getHeaders(),
+      });
+      if (res.ok) {
+        fetchData();
+      }
     } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const fetchPredictions = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/predictions/latest`);
-      if (res.ok) setPrediction(await res.json());
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const fetchNews = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/news/latest?limit=15`);
-      if (res.ok) setNews(await res.json());
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const fetchAlerts = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/alerts`);
-      if (res.ok) setAlerts(await res.json());
-    } catch (e) {
-      console.error(e);
+      console.error("Error deleting holding", err);
     }
   };
 
   const handleCreateAlert = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_BASE}/api/alerts`, {
+      const res = await fetch("/api/alerts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify({
-          alert_type: newAlertType,
-          target_metric: "KJPL_GOLD",
-          threshold: Number(newAlertThreshold),
-          notes: `Alert for ${newAlertType} ${newAlertThreshold}`,
+          alert_type: alertForm.alert_type,
+          target_metric: alertForm.target_metric,
+          threshold: parseFloat(alertForm.threshold),
+          notes: alertForm.notes,
         }),
       });
-      if (res.ok) fetchAlerts();
+      if (res.ok) {
+        setIsAddAlertOpen(false);
+        fetchData();
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Error creating alert", err);
     }
   };
 
   const handleDeleteAlert = async (id: number) => {
     try {
-      const res = await fetch(`${API_BASE}/api/alerts/${id}`, { method: "DELETE" });
-      if (res.ok) fetchAlerts();
+      const res = await fetch(`/api/alerts/${id}`, {
+        method: "DELETE",
+        headers: getHeaders(),
+      });
+      if (res.ok) {
+        fetchData();
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Error deleting alert", err);
     }
   };
 
+  const filteredNews = news.filter((item) => {
+    if (newsFilter === "BULLISH") return item.sentiment_label === "POSITIVE";
+    if (newsFilter === "BEARISH") return item.sentiment_label === "NEGATIVE";
+    if (newsFilter === "GOLD_ONLY") return item.is_gold_relevant;
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-amber-500 selection:text-black">
-      {/* Top Header */}
-      <header className="border-b border-zinc-800 bg-zinc-900/60 backdrop-blur sticky top-0 z-40">
+      {/* Top Header / Branding */}
+      <header className="border-b border-zinc-800/80 bg-zinc-900/40 backdrop-blur sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center font-bold text-black shadow-lg shadow-amber-500/20">
@@ -358,19 +446,22 @@ export default function GoldSenseDashboard() {
             </div>
           </div>
 
-          {/* Navigation Bar */}
-          <nav className="hidden md:flex space-x-1">
+          {/* Navigation Bar across all 8 required product areas */}
+          <nav className="hidden lg:flex space-x-1">
             {[
               { id: "overview", label: "Overview" },
+              { id: "markets", label: "Markets" },
               { id: "portfolio", label: "My Bullion" },
-              { id: "predictions", label: "AI Predictions" },
-              { id: "news", label: "News Intelligence" },
+              { id: "predictions", label: "Predictions" },
+              { id: "news", label: "News Feed" },
+              { id: "research", label: "Research & History" },
               { id: "alerts", label: "Alerts" },
+              { id: "settings", label: "Settings" },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   activeTab === tab.id
                     ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                     : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
@@ -381,167 +472,176 @@ export default function GoldSenseDashboard() {
             ))}
           </nav>
 
-          {/* Refresh Action */}
+          {/* Right Refresh & Status Widget */}
           <div className="flex items-center space-x-3">
-            {refreshMessage && (
-              <span className="text-xs text-amber-400/90 font-mono animate-pulse hidden sm:inline">
-                {refreshMessage}
-              </span>
+            {overview && (
+              <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-400">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>{overview.overall_freshness}</span>
+                <span className="text-zinc-600">|</span>
+                <span>Ahmedabad Spot: <strong className="text-amber-400">₹{overview.kjpl?.gold_mjdta?.toLocaleString()}/g</strong></span>
+              </div>
             )}
             <button
-              onClick={handleManualRefresh}
-              disabled={refreshing}
-              className="flex items-center space-x-1 px-3 py-1.5 text-xs font-semibold rounded-md border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 active:scale-95 transition"
+              onClick={handleRefreshRates}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition-all disabled:opacity-50"
             >
-              <span className={`inline-block w-2 h-2 rounded-full ${overview?.overall_freshness === "FRESH" ? "bg-emerald-500" : "bg-amber-500"}`} />
-              <span>{refreshing ? "Refreshing..." : "Refresh"}</span>
+              <svg className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {isRefreshing ? "Updating..." : "Refresh"}
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* OVERVIEW TAB */}
+      {/* Cooldown / Refresh Toast Notice */}
+      {refreshNotice && (
+        <div className="bg-amber-950/80 border-b border-amber-800/50 text-amber-200 px-4 py-2 text-xs text-center flex items-center justify-center gap-2">
+          <span>ℹ️</span> {refreshNotice}
+        </div>
+      )}
+
+      {/* Main Content Viewport */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        
+        {/* ========================================================================= */}
+        {/* TAB 1: OVERVIEW                                                           */}
+        {/* ========================================================================= */}
         {activeTab === "overview" && (
-          <div className="space-y-8">
-            {/* Rates Banner */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* KJPL Gold 24K */}
-              <div className="p-5 rounded-xl border border-zinc-800 bg-zinc-900/50 shadow-sm relative overflow-hidden group hover:border-amber-500/40 transition">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">KJPL Gold 24K (MJDTA)</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/20">
-                    {overview?.kjpl?.freshness || "FRESH"}
+          <div className="space-y-6">
+            {/* Top Market Bar */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                <div className="text-xs font-medium text-zinc-400 uppercase tracking-wider">KJPL Gold 999 (24K)</div>
+                <div className="text-2xl font-bold text-amber-400 mt-1">₹{overview?.kjpl?.gold_mjdta?.toLocaleString() || "—"} <span className="text-xs font-normal text-zinc-400">/ gram</span></div>
+                <div className="mt-2 text-xs flex items-center gap-1.5 text-zinc-400">
+                  <span className={overview?.kjpl?.change_24h_inr && overview.kjpl.change_24h_inr >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                    {overview?.kjpl?.change_24h_inr && overview.kjpl.change_24h_inr >= 0 ? "+" : ""}
+                    {overview?.kjpl?.change_24h_inr} ({overview?.kjpl?.change_24h_pct}%)
                   </span>
-                </div>
-                <div className="text-3xl font-bold font-mono text-amber-400">
-                  ₹{overview?.kjpl?.gold_mjdta?.toLocaleString("en-IN") || "—"}{" "}
-                  <span className="text-xs font-normal text-zinc-500">/ gram</span>
-                </div>
-                <div className="mt-3 flex items-center justify-between text-xs text-zinc-400 border-t border-zinc-800/80 pt-2">
-                  <span>Published: {overview?.kjpl?.published_time || "N/A"}</span>
-                  <span className="text-emerald-400 font-semibold font-mono">
-                    +{overview?.kjpl?.change_24h_pct || 0}%
-                  </span>
+                  <span>vs prev</span>
                 </div>
               </div>
 
-              {/* KJPL Silver */}
-              <div className="p-5 rounded-xl border border-zinc-800 bg-zinc-900/50 shadow-sm relative overflow-hidden group hover:border-zinc-400/40 transition">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">KJPL Silver (999)</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono">
-                    Domestic
+              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 shadow-sm">
+                <div className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Global Gold Spot (USD)</div>
+                <div className="text-2xl font-bold text-zinc-100 mt-1">${overview?.market?.xauusd?.toFixed(1) || "—"} <span className="text-xs font-normal text-zinc-400">/ troy oz</span></div>
+                <div className="mt-2 text-xs text-zinc-400 flex items-center gap-1.5">
+                  <span className={overview?.market?.xauusd_change_24h && overview.market.xauusd_change_24h >= 0 ? "text-emerald-400" : "text-rose-400"}>
+                    {overview?.market?.xauusd_change_24h && overview.market.xauusd_change_24h >= 0 ? "+" : ""}{overview?.market?.xauusd_change_24h} ({overview?.market?.xauusd_change_24h_pct}%)
                   </span>
-                </div>
-                <div className="text-3xl font-bold font-mono text-zinc-200">
-                  ₹{overview?.kjpl?.silver_mjdta?.toLocaleString("en-IN") || "—"}{" "}
-                  <span className="text-xs font-normal text-zinc-500">/ gram</span>
-                </div>
-                <div className="mt-3 flex items-center justify-between text-xs text-zinc-400 border-t border-zinc-800/80 pt-2">
-                  <span>₹{((overview?.kjpl?.silver_mjdta || 0) * 1000).toLocaleString("en-IN")} / kg</span>
-                  <span className="text-zinc-400 font-mono">Physical</span>
+                  <span>COMEX GC=F</span>
                 </div>
               </div>
 
-              {/* COMEX Gold (GC=F) */}
-              <div className="p-5 rounded-xl border border-zinc-800 bg-zinc-900/50 shadow-sm relative overflow-hidden group hover:border-blue-500/40 transition">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">COMEX Gold (GC=F)</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono border border-blue-500/20">
-                    US Global
-                  </span>
-                </div>
-                <div className="text-3xl font-bold font-mono text-blue-400">
-                  ${overview?.market?.xauusd?.toFixed(1) || "—"}{" "}
-                  <span className="text-xs font-normal text-zinc-500">/ oz</span>
-                </div>
-                <div className="mt-3 flex items-center justify-between text-xs text-zinc-400 border-t border-zinc-800/80 pt-2">
-                  <span>USD/INR: ₹{overview?.market?.usdinr?.toFixed(2)}</span>
-                  <span className="text-blue-400 font-mono font-semibold">
-                    +{overview?.market?.xauusd_change_24h_pct || 0}%
-                  </span>
+              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 shadow-sm">
+                <div className="text-xs font-medium text-zinc-400 uppercase tracking-wider">USD / INR Exchange</div>
+                <div className="text-2xl font-bold text-zinc-100 mt-1">₹{overview?.market?.usdinr?.toFixed(2) || "—"}</div>
+                <div className="mt-2 text-xs text-zinc-400">
+                  Global Parity: <strong className="text-zinc-200">₹{overview?.derived?.global_gold_inr_per_gram?.toLocaleString()}</strong> / g
                 </div>
               </div>
 
-              {/* Domestic Premium */}
-              <div className="p-5 rounded-xl border border-zinc-800 bg-zinc-900/50 shadow-sm relative overflow-hidden group hover:border-purple-500/40 transition">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Domestic Premium</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 font-mono border border-purple-500/20">
-                    Tariff & Duty
-                  </span>
-                </div>
-                <div className="text-3xl font-bold font-mono text-purple-400">
-                  +{overview?.derived?.domestic_premium_pct?.toFixed(2) || "—"}%
-                </div>
-                <div className="mt-3 flex items-center justify-between text-xs text-zinc-400 border-t border-zinc-800/80 pt-2">
-                  <span>Diff: +₹{overview?.derived?.domestic_premium_inr_per_gram?.toFixed(1)}/g</span>
-                  <span>Global: ₹{overview?.derived?.global_gold_inr_per_gram?.toFixed(0)}/g</span>
+              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 shadow-sm bg-gradient-to-br from-amber-950/20 to-zinc-900/60">
+                <div className="text-xs font-medium text-amber-300 uppercase tracking-wider">Domestic Disparity Premium</div>
+                <div className="text-2xl font-bold text-amber-400 mt-1">+{overview?.derived?.domestic_premium_pct || "0.0"}%</div>
+                <div className="mt-2 text-xs text-zinc-400">
+                  Spread: <strong className="text-amber-300">+₹{overview?.derived?.domestic_premium_inr_per_gram || "0"}</strong> / g (Customs BCD + Cess)
                 </div>
               </div>
             </div>
 
-            {/* Quick Analytics & Insights Card */}
+            {/* Middle Split: Portfolio Summary & Prediction Indicator */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 p-6 rounded-xl border border-zinc-800 bg-zinc-900/40 space-y-4">
-                <h3 className="text-sm font-semibold tracking-wide uppercase text-zinc-300">
-                  Indian Bullion vs International Futures Arbitrage
-                </h3>
-                <p className="text-sm text-zinc-400 leading-relaxed">
-                  Indian spot retail bullion (MJDTA/KJPL) currently trades at a{" "}
-                  <span className="text-amber-400 font-semibold font-mono">
-                    +{overview?.derived?.domestic_premium_pct}%
-                  </span>{" "}
-                  premium over global spot futures. This spread reflects India’s Basic Customs Duty (6% BCD + AIDC), local clearing, and refiner premiums.
-                </p>
+              {/* Portfolio Quick Card */}
+              <div className="lg:col-span-2 bg-zinc-900/40 border border-zinc-800/80 rounded-xl p-6">
+                <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+                  <div>
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>Personal Bullion Vault</span>
+                      <span className="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Private Holdings</span>
+                    </h2>
+                    <p className="text-xs text-zinc-400 mt-0.5">Physical bullion marked-to-market against Ahmedabad spot rate</p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab("portfolio")}
+                    className="text-xs text-amber-400 hover:text-amber-300 font-medium"
+                  >
+                    View Holdings →
+                  </button>
+                </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-zinc-800 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
                   <div>
-                    <span className="text-zinc-500 block">International Rate (INR/g)</span>
-                    <span className="text-base font-bold font-mono text-zinc-200">
-                      ₹{overview?.derived?.global_gold_inr_per_gram?.toLocaleString("en-IN")}
-                    </span>
+                    <div className="text-xs text-zinc-400">Fine Gold Weight</div>
+                    <div className="text-xl font-bold text-amber-400 mt-1">{portfolioSummary?.gold?.fine_weight_grams?.toFixed(2) || "0.00"} g</div>
+                    <div className="text-xs text-zinc-500 mt-0.5">({portfolioSummary?.gold?.fine_weight_kg?.toFixed(4) || "0"} kg pure)</div>
                   </div>
                   <div>
-                    <span className="text-zinc-500 block">Domestic Gold/Silver Ratio</span>
-                    <span className="text-base font-bold font-mono text-zinc-200">
-                      {overview?.derived?.domestic_gold_silver_ratio} : 1
-                    </span>
+                    <div className="text-xs text-zinc-400">Fine Silver Weight</div>
+                    <div className="text-xl font-bold text-zinc-300 mt-1">{portfolioSummary?.silver?.fine_weight_grams?.toFixed(2) || "0.00"} g</div>
+                    <div className="text-xs text-zinc-500 mt-0.5">({portfolioSummary?.silver?.fine_weight_kg?.toFixed(4) || "0"} kg pure)</div>
                   </div>
                   <div>
-                    <span className="text-zinc-500 block">Global Gold/Silver Ratio</span>
-                    <span className="text-base font-bold font-mono text-zinc-200">
-                      {overview?.derived?.global_gold_silver_ratio} : 1
-                    </span>
+                    <div className="text-xs text-zinc-400">Total Portfolio Value</div>
+                    <div className="text-xl font-bold text-white mt-1">₹{portfolioSummary?.total_estimated_valuation_inr?.toLocaleString() || "0"}</div>
+                    <div className="text-xs text-zinc-500 mt-0.5">{portfolioSummary?.unique_holdings || 0} items cataloged</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-zinc-400">Unrealized Gain / Loss</div>
+                    <div className={`text-xl font-bold mt-1 ${
+                      portfolioSummary?.unrealized_gain_loss_inr === null
+                        ? "text-zinc-500"
+                        : (portfolioSummary?.unrealized_gain_loss_inr || 0) >= 0
+                        ? "text-emerald-400"
+                        : "text-rose-400"
+                    }`}>
+                      {portfolioSummary?.unrealized_gain_loss_inr === null
+                        ? "Unmeasured"
+                        : `₹${portfolioSummary?.unrealized_gain_loss_inr?.toLocaleString()} (${portfolioSummary?.unrealized_gain_loss_pct}%)`}
+                    </div>
+                    <div className="text-xs text-zinc-500 mt-0.5">
+                      {portfolioSummary?.total_recorded_acquisition_cost_inr ? "Based on recorded cost" : "Acquisition cost unknown"}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Quick AI & Data Health Card */}
-              <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/40 flex flex-col justify-between">
+              {/* Prediction Readiness Card */}
+              <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl p-6 flex flex-col justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold tracking-wide uppercase text-zinc-300 mb-2">
-                    Predictive Engine Status
-                  </h3>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
-                    <span className="text-xs font-mono font-medium text-amber-400">
-                      Supervised Data Accumulation (34/50 Days)
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">AI ML Prediction Status</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">Experimental</span>
                   </div>
-                  <p className="text-xs text-zinc-400 leading-relaxed">
-                    XGBoost models strictly enforce chronological zero-lookahead validation. 16 more daily market observations needed to train safely without overfitting.
+                  <h3 className="text-base font-bold text-white mt-3">Statistical Sample Readiness</h3>
+                  <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
+                    {prediction?.message || "Supervised models require at least 50 historical daily events for safe walk-forward validation without overfitting."}
                   </p>
+
+                  <div className="mt-4">
+                    <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                      <span>Collected Events: <strong>{prediction?.metrics?.current_samples || 34}</strong></span>
+                      <span>Target Threshold: <strong>50 Events</strong></span>
+                    </div>
+                    <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-amber-500 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${prediction?.metrics?.progress_pct || 68}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="pt-4 border-t border-zinc-800 mt-4">
+                <div className="mt-6 pt-4 border-t border-zinc-800/80 flex items-center justify-between">
+                  <span className="text-xs text-zinc-400">Naive Persistence MAE: <strong>₹{prediction?.baseline_benchmarks?.naive_persistence?.mae_inr_per_g || 68.28}/g</strong></span>
                   <button
                     onClick={() => setActiveTab("predictions")}
-                    className="w-full py-2 px-3 text-xs font-semibold rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition text-center"
+                    className="text-xs font-medium text-amber-400 hover:text-amber-300"
                   >
-                    View ML Architecture & Readiness
+                    View Model Specs →
                   </button>
                 </div>
               </div>
@@ -549,501 +649,776 @@ export default function GoldSenseDashboard() {
           </div>
         )}
 
-        {/* PORTFOLIO TAB */}
-        {activeTab === "portfolio" && (
-          <div className="space-y-8">
-            {/* Portfolio Summary Card */}
-            <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/60 shadow-md">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-zinc-800 gap-4">
-                <div>
-                  <h2 className="text-xl font-bold tracking-tight text-white">Personal Bullion Vault</h2>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Valuation benchmarked against Madras Jewellers & Diamond Traders Association (MJDTA) rates.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-amber-500 text-black hover:bg-amber-400 active:scale-95 transition shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
-                >
-                  <span>+</span> Add Bullion Holding
-                </button>
-              </div>
+        {/* ========================================================================= */}
+        {/* TAB 2: MARKETS                                                            */}
+        {/* ========================================================================= */}
+        {activeTab === "markets" && (
+          <div className="space-y-6">
+            <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl p-6">
+              <h2 className="text-lg font-bold text-white">Precious Metals & Forex Market Monitor</h2>
+              <p className="text-xs text-zinc-400 mt-1">Multi-source feeds comparing Indian delivery spot rates with COMEX futures benchmarks</p>
 
-              {/* Portfolio KPIs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-6">
-                <div>
-                  <span className="text-xs font-medium text-zinc-400 block">Total Estimated Value</span>
-                  <span className="text-3xl font-extrabold font-mono text-white mt-1 block">
-                    ₹{portfolio?.total_estimated_valuation_inr?.toLocaleString("en-IN") || "0"}
-                  </span>
-                  <span className="text-[11px] text-zinc-500 mt-0.5 block">Based on fine metal weight</span>
-                </div>
-
-                <div>
-                  <span className="text-xs font-medium text-zinc-400 block">Recorded Cost Basis</span>
-                  <span className="text-2xl font-bold font-mono text-zinc-300 mt-1 block">
-                    {portfolio?.total_recorded_acquisition_cost_inr
-                      ? `₹${portfolio.total_recorded_acquisition_cost_inr.toLocaleString("en-IN")}`
-                      : "Not Recorded"}
-                  </span>
-                  <span className="text-[11px] text-zinc-500 mt-0.5 block">Known purchase price</span>
-                </div>
-
-                <div>
-                  <span className="text-xs font-medium text-zinc-400 block">Unrealized Gain / Loss</span>
-                  <span
-                    className={`text-2xl font-bold font-mono mt-1 block ${
-                      (portfolio?.unrealized_gain_loss_inr || 0) >= 0 ? "text-emerald-400" : "text-rose-400"
-                    }`}
-                  >
-                    {portfolio?.unrealized_gain_loss_inr !== null && portfolio?.unrealized_gain_loss_inr !== undefined
-                      ? `${portfolio.unrealized_gain_loss_inr >= 0 ? "+" : ""}₹${portfolio.unrealized_gain_loss_inr.toLocaleString("en-IN")} (${portfolio.unrealized_gain_loss_pct}%)`
-                      : "—"}
-                  </span>
-                  <span className="text-[11px] text-zinc-500 mt-0.5 block">Excludes uncosted gifts/inheritance</span>
-                </div>
-
-                <div>
-                  <span className="text-xs font-medium text-zinc-400 block">Fine Metal Holdings</span>
-                  <div className="flex gap-4 mt-1">
-                    <div>
-                      <span className="text-xs font-mono font-bold text-amber-400">
-                        {portfolio?.gold.fine_weight_grams?.toFixed(1) || 0}g
-                      </span>
-                      <span className="text-[10px] text-zinc-500 block">Gold ({portfolio?.gold.allocation_pct}%)</span>
-                    </div>
-                    <div>
-                      <span className="text-xs font-mono font-bold text-zinc-300">
-                        {portfolio?.silver.fine_weight_grams?.toFixed(0) || 0}g
-                      </span>
-                      <span className="text-[10px] text-zinc-500 block">Silver ({portfolio?.silver.allocation_pct}%)</span>
-                    </div>
+              {/* Trading Session Status Indicators */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-zinc-300">Indian Physical Bullion (KJPL Ahmedabad)</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                      {overview?.trading_status?.indian_physical_market || "OPEN"}
+                    </span>
                   </div>
+                  <p className="text-xs text-zinc-400 mt-2">{overview?.trading_status?.indian_physical_description || "Physical bullion trading session."}</p>
+                  <p className="text-xs text-zinc-500 mt-1">Server Clock: {overview?.trading_status?.server_time_ist || "Asia/Kolkata"}</p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-zinc-300">US COMEX Futures & Global Forex</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                      {overview?.trading_status?.global_futures_market || "OPEN"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-2">{overview?.trading_status?.global_futures_description || "Global futures & currency exchange active."}</p>
+                  <p className="text-xs text-zinc-500 mt-1">Tickers: COMEX Gold (GC=F), Silver (SI=F), USD/INR (USDINR=X)</p>
                 </div>
               </div>
+
+              {/* Conversion Math Explainer Box */}
+              <div className="p-4 rounded-lg bg-zinc-900/60 border border-zinc-800 mt-6 text-xs text-zinc-300 space-y-2">
+                <div className="font-semibold text-amber-400">Exact Conversion & Duty Math:</div>
+                <div className="font-mono bg-zinc-950 p-2.5 rounded border border-zinc-800 text-zinc-300">
+                  Global Gold (INR/g) = [COMEX Gold (${overview?.market?.xauusd}) × USDINR (₹{overview?.market?.usdinr})] / 31.1034768 = ₹{overview?.derived?.global_gold_inr_per_gram?.toLocaleString()} / g
+                </div>
+                <div className="font-mono bg-zinc-950 p-2.5 rounded border border-zinc-800 text-zinc-300">
+                  Domestic Disparity = [KJPL Rate (₹{overview?.kjpl?.gold_mjdta}) - Global Parity (₹{overview?.derived?.global_gold_inr_per_gram})] = +₹{overview?.derived?.domestic_premium_inr_per_gram} (+{overview?.derived?.domestic_premium_pct}%)
+                </div>
+                <p className="text-zinc-500 text-xs">
+                  *The domestic premium reflects India's 6% Basic Customs Duty (BCD), Agriculture Infrastructure Development Cess (AIDC), local air freight, and physical vault delivery charges.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 3: MY BULLION (PORTFOLIO)                                             */}
+        {/* ========================================================================= */}
+        {activeTab === "portfolio" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">Personal Physical Bullion Holdings</h2>
+                <p className="text-xs text-zinc-400 mt-0.5">Secure, isolated physical gold and silver inventory tracking</p>
+              </div>
+              <button
+                onClick={() => {
+                  setHoldingForm({
+                    metal_type: "GOLD",
+                    product_name: "24K Minted Bar",
+                    purity: "0.999",
+                    gross_weight: "10.0",
+                    weight_unit: "g",
+                    quantity: "1",
+                    acquisition_date: new Date().toISOString().split("T")[0],
+                    acquisition_cost_inr: "",
+                    notes: "Personal Vault",
+                  });
+                  setIsAddHoldingOpen(true);
+                }}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold rounded-lg transition-all shadow-md shadow-amber-500/20"
+              >
+                + Add Physical Holding
+              </button>
             </div>
 
             {/* Holdings Table */}
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 overflow-hidden">
-              <div className="px-6 py-4 border-b border-zinc-800 flex justify-between items-center">
-                <h3 className="text-sm font-semibold tracking-wide uppercase text-zinc-300">
-                  Recorded Holdings ({holdings.length})
-                </h3>
-              </div>
-
-              {holdings.length === 0 ? (
-                <div className="text-center py-16 px-4">
-                  <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3 text-zinc-500">
-                    📦
-                  </div>
-                  <h4 className="text-sm font-medium text-zinc-300">No Bullion Holdings Recorded</h4>
-                  <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
-                    Track your personal coins, bars, and cast ingots. Your portfolio data is private and never mixed with public market feeds.
-                  </p>
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    className="mt-4 px-4 py-1.5 text-xs font-semibold rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition"
-                  >
-                    Add First Bullion Item
-                  </button>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-zinc-900/80 text-zinc-400 font-mono uppercase text-[10px] border-b border-zinc-800">
+            <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-zinc-800 bg-zinc-900/80 text-zinc-400 uppercase tracking-wider font-semibold">
+                      <th className="py-3 px-4">Item & Fineness</th>
+                      <th className="py-3 px-4">Gross Weight</th>
+                      <th className="py-3 px-4">Fine Pure Weight</th>
+                      <th className="py-3 px-4">Qty</th>
+                      <th className="py-3 px-4">Acquisition Cost</th>
+                      <th className="py-3 px-4">Current Valuation</th>
+                      <th className="py-3 px-4">Unrealized PnL</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800/60">
+                    {holdings.length === 0 ? (
                       <tr>
-                        <th className="px-6 py-3">Product</th>
-                        <th className="px-4 py-3">Metal / Purity</th>
-                        <th className="px-4 py-3">Weight (Gross / Fine)</th>
-                        <th className="px-4 py-3">Quantity</th>
-                        <th className="px-4 py-3">Acquisition Cost</th>
-                        <th className="px-4 py-3">Current Value</th>
-                        <th className="px-4 py-3">Gain / Loss</th>
-                        <th className="px-4 py-3 text-right">Actions</th>
+                        <td colSpan={8} className="py-8 text-center text-zinc-500">
+                          No bullion holdings cataloged yet. Click "+ Add Physical Holding" to record gold or silver.
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-800/60 font-sans">
-                      {holdings.map((h) => (
-                        <tr key={h.id} className="hover:bg-zinc-800/30 transition">
-                          <td className="px-6 py-4 font-medium text-zinc-200">
-                            {h.product_name}
-                            {h.notes && <span className="block text-[11px] text-zinc-500">{h.notes}</span>}
+                    ) : (
+                      holdings.map((h) => (
+                        <tr key={h.id} className="hover:bg-zinc-800/30 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-white">{h.product_name}</div>
+                            <div className="text-zinc-500 text-xs">
+                              {h.metal_type} • Purity: {(h.purity * 1000).toFixed(1)} / 1000 ({h.purity >= 0.995 ? "24K" : h.purity >= 0.916 ? "22K" : "18K"})
+                            </div>
                           </td>
-                          <td className="px-4 py-4">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${
-                                h.metal_type === "GOLD"
-                                  ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                                  : "bg-zinc-700/30 text-zinc-300 border border-zinc-600/30"
-                              }`}
-                            >
-                              {h.metal_type} {h.purity * 1000}
-                            </span>
+                          <td className="py-3.5 px-4 font-medium text-zinc-200">
+                            {h.gross_weight_grams.toFixed(2)} g
                           </td>
-                          <td className="px-4 py-4 font-mono text-zinc-300">
-                            {h.gross_weight_grams}g{" "}
-                            <span className="text-[11px] text-zinc-500">({h.fine_weight_grams}g fine)</span>
+                          <td className="py-3.5 px-4 font-semibold text-amber-400">
+                            {h.fine_weight_grams.toFixed(2)} g
+                            <span className="block text-zinc-500 text-xs font-normal">({h.fine_weight_kg.toFixed(4)} kg)</span>
                           </td>
-                          <td className="px-4 py-4 font-mono text-zinc-300">{h.quantity}</td>
-                          <td className="px-4 py-4 font-mono text-zinc-400">
-                            {h.acquisition_cost_inr ? `₹${h.acquisition_cost_inr.toLocaleString("en-IN")}` : "—"}
+                          <td className="py-3.5 px-4 text-zinc-300 font-medium">
+                            {h.quantity}
                           </td>
-                          <td className="px-4 py-4 font-mono font-bold text-zinc-100">
-                            ₹{h.current_valuation_inr.toLocaleString("en-IN")}
-                          </td>
-                          <td className="px-4 py-4 font-mono font-semibold">
-                            {h.unrealized_gain_loss_inr !== null ? (
-                              <span className={h.unrealized_gain_loss_inr >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                                {h.unrealized_gain_loss_inr >= 0 ? "+" : ""}₹{h.unrealized_gain_loss_inr.toLocaleString("en-IN")}{" "}
-                                ({h.unrealized_gain_loss_pct}%)
-                              </span>
+                          <td className="py-3.5 px-4 text-zinc-300">
+                            {h.acquisition_cost_inr !== null ? (
+                              <span>₹{h.acquisition_cost_inr.toLocaleString()}</span>
                             ) : (
-                              <span className="text-zinc-600">N/A</span>
+                              <span className="text-zinc-500 italic">Unknown / Inherited</span>
                             )}
                           </td>
-                          <td className="px-4 py-4 text-right">
+                          <td className="py-3.5 px-4 font-bold text-white">
+                            ₹{h.current_valuation_inr.toLocaleString()}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {h.unrealized_gain_loss_inr !== null ? (
+                              <span className={`font-semibold ${h.unrealized_gain_loss_inr >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                                {h.unrealized_gain_loss_inr >= 0 ? "+" : ""}₹{h.unrealized_gain_loss_inr.toLocaleString()} ({h.unrealized_gain_loss_pct}%)
+                              </span>
+                            ) : (
+                              <span className="text-zinc-500">—</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-right space-x-2">
+                            <button
+                              onClick={() => openEditModal(h)}
+                              className="text-amber-400 hover:text-amber-300 transition-colors p-1"
+                              title="Edit Holding"
+                            >
+                              ✎
+                            </button>
                             <button
                               onClick={() => handleDeleteHolding(h.id)}
-                              className="text-zinc-500 hover:text-rose-400 transition text-[11px]"
+                              className="text-rose-400 hover:text-rose-300 transition-colors p-1"
+                              title="Delete Holding"
                             >
-                              Remove
+                              🗑
                             </button>
                           </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Historical Valuation Chart / Table */}
+            {portfolioHistory.length > 0 && (
+              <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl p-6">
+                <h3 className="text-base font-bold text-white">Historical Portfolio Valuation Trajectory</h3>
+                <p className="text-xs text-zinc-400 mt-1">Vault mark-to-market performance across recorded KJPL historical dates</p>
+                <div className="overflow-x-auto mt-4 max-h-60 overflow-y-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-zinc-800 text-zinc-400">
+                        <th className="py-2 px-3">Date</th>
+                        <th className="py-2 px-3">Gold Spot (₹/g)</th>
+                        <th className="py-2 px-3">Silver Spot (₹/kg)</th>
+                        <th className="py-2 px-3">Vault Valuation</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/50">
+                      {portfolioHistory.slice(-10).reverse().map((rec, i) => (
+                        <tr key={i} className="hover:bg-zinc-800/20">
+                          <td className="py-2 px-3 text-zinc-300">{rec.date}</td>
+                          <td className="py-2 px-3 text-amber-400">₹{rec.gold_rate_inr.toLocaleString()}</td>
+                          <td className="py-2 px-3 text-zinc-300">₹{(rec.silver_rate_inr * 1000).toLocaleString()}</td>
+                          <td className="py-2 px-3 font-bold text-white">₹{rec.total_valuation_inr.toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                </div>
-              )}
-            </div>
-
-            {/* Add Holding Modal */}
-            {showAddModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-                <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl space-y-4">
-                  <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
-                    <h3 className="text-base font-bold text-white">Add Bullion Holding</h3>
-                    <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-white">
-                      ✕
-                    </button>
-                  </div>
-
-                  <form onSubmit={handleAddHolding} className="space-y-4 text-xs">
-                    <div>
-                      <label className="block text-zinc-400 mb-1">Precious Metal</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => { setNewMetal("GOLD"); setNewPurity(0.999); }}
-                          className={`py-2 rounded font-medium ${newMetal === "GOLD" ? "bg-amber-500 text-black" : "bg-zinc-800 text-zinc-400"}`}
-                        >
-                          Gold (24K / 22K)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setNewMetal("SILVER"); setNewPurity(0.999); }}
-                          className={`py-2 rounded font-medium ${newMetal === "SILVER" ? "bg-zinc-200 text-black" : "bg-zinc-800 text-zinc-400"}`}
-                        >
-                          Silver (999)
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-zinc-400 mb-1">Product Description</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. MMTC-PAMP 24K Bar, Kundan 10g Coin"
-                        value={newProduct}
-                        onChange={(e) => setNewProduct(e.target.value)}
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 focus:outline-none focus:border-amber-500"
-                        required
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-zinc-400 mb-1">Gross Weight</label>
-                        <input
-                          type="number"
-                          step="any"
-                          value={newWeight}
-                          onChange={(e) => setNewWeight(Number(e.target.value))}
-                          className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 font-mono"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-zinc-400 mb-1">Unit</label>
-                        <select
-                          value={newUnit}
-                          onChange={(e) => setNewUnit(e.target.value as any)}
-                          className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 font-mono"
-                        >
-                          <option value="g">Grams (g)</option>
-                          <option value="kg">Kilograms (kg)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-zinc-400 mb-1">Purity (Fineness)</label>
-                        <select
-                          value={newPurity}
-                          onChange={(e) => setNewPurity(Number(e.target.value))}
-                          className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 font-mono"
-                        >
-                          <option value={0.999}>0.999 (24K Pure)</option>
-                          <option value={0.995}>0.995 (Standard Bullion)</option>
-                          <option value={0.916}>0.916 (22K Sovereign)</option>
-                          <option value={0.750}>0.750 (18K Jewelry)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-zinc-400 mb-1">Quantity</label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={newQuantity}
-                          onChange={(e) => setNewQuantity(Number(e.target.value))}
-                          className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-zinc-400 mb-1">Total Acquisition Cost (₹, optional)</label>
-                      <input
-                        type="number"
-                        placeholder="Leave blank if inherited or cost unknown"
-                        value={newCost}
-                        onChange={(e) => setNewCost(e.target.value)}
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-100 font-mono"
-                      />
-                    </div>
-
-                    <div className="flex justify-end space-x-2 pt-2 border-t border-zinc-800">
-                      <button
-                        type="button"
-                        onClick={() => setShowAddModal(false)}
-                        className="px-4 py-2 rounded bg-zinc-800 text-zinc-400 hover:text-white"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-2 rounded bg-amber-500 font-semibold text-black hover:bg-amber-400"
-                      >
-                        Save Holding
-                      </button>
-                    </div>
-                  </form>
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {/* PREDICTIONS TAB */}
+        {/* ========================================================================= */}
+        {/* TAB 4: PREDICTIONS                                                        */}
+        {/* ========================================================================= */}
         {activeTab === "predictions" && (
           <div className="space-y-6">
-            <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/40 space-y-4">
+            <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl p-6">
               <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
                 <div>
-                  <h2 className="text-lg font-bold text-white">AI Bullion Forecasting Engine</h2>
-                  <p className="text-xs text-zinc-400">
-                    Target: Next published 24K KJPL MJDTA opening rate in INR per gram.
-                  </p>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <span>AI Gold-Price Forecasting</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                      EXPERIMENTAL DATA COLLECTION
+                    </span>
+                  </h2>
+                  <p className="text-xs text-zinc-400 mt-1">Zero-lookahead supervised time-series forecasting model for Ahmedabad 24K spot gold</p>
                 </div>
-                <span className="text-xs px-2.5 py-1 rounded border border-amber-500/30 bg-amber-500/10 text-amber-400 font-mono font-medium">
-                  {prediction?.status || "DATA_COLLECTION_PHASE"}
-                </span>
               </div>
 
-              {/* Progress Card */}
-              <div className="p-5 rounded-lg border border-zinc-800/80 bg-zinc-950/60 space-y-3">
-                <div className="flex justify-between text-xs text-zinc-300 font-mono">
-                  <span>Data Collection Progress for Supervised XGBoost</span>
-                  <span className="text-amber-400 font-bold">
-                    {prediction?.metrics?.current_samples || 34} / {prediction?.metrics?.required_samples || 50} Events ({prediction?.metrics?.progress_pct || 68.0}%)
-                  </span>
+              {/* Progress and Data Integrity Notice */}
+              <div className="mt-6 p-4 rounded-lg bg-zinc-950 border border-zinc-800">
+                <div className="flex justify-between text-xs text-zinc-300 mb-2">
+                  <span className="font-semibold">Dataset Accumulation Progress:</span>
+                  <span className="text-amber-400 font-bold">{prediction?.metrics?.current_samples || 34} / 50 Observed Events ({prediction?.metrics?.progress_pct || 68}%)</span>
                 </div>
-                <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div className="w-full bg-zinc-800 rounded-full h-2.5 overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full transition-all duration-500"
-                    style={{ width: `${prediction?.metrics?.progress_pct || 68.0}%` }}
+                    className="bg-gradient-to-r from-amber-500 to-amber-400 h-2.5 rounded-full transition-all duration-500"
+                    style={{ width: `${prediction?.metrics?.progress_pct || 68}%` }}
                   />
                 </div>
-                <p className="text-xs text-zinc-400 leading-relaxed pt-1">
-                  {prediction?.message ||
-                    "Supervised models enforce zero-lookahead walk-forward validation and require 50 daily market observations before generating live signals."}
+                <p className="text-xs text-zinc-400 mt-3 leading-relaxed">
+                  {prediction?.message}
                 </p>
               </div>
 
-              {/* Features Tracked */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                <div className="p-4 rounded border border-zinc-800/60 bg-zinc-900/30">
-                  <span className="text-xs font-semibold text-zinc-300 block mb-1">Global Macro & FX</span>
-                  <span className="text-[11px] text-zinc-500 block leading-relaxed">
-                    COMEX Gold (`GC=F`), Silver (`SI=F`), Spot USD/INR, 24h momentum returns.
-                  </span>
+              {/* Baseline Persistence Benchmarks */}
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-zinc-200">Baseline Evaluation Benchmarks (Zero-Lookahead Backtest):</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                  <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+                    <div className="text-xs text-zinc-400 font-semibold uppercase">Naive Persistence (Next = Current)</div>
+                    <div className="text-2xl font-bold text-white mt-1">MAE: ±₹{prediction?.baseline_benchmarks?.naive_persistence?.mae_inr_per_g || 68.28}/g</div>
+                    <div className="text-xs text-zinc-500 mt-1">RMSE: ₹{prediction?.baseline_benchmarks?.naive_persistence?.rmse_inr_per_g || 89.05}/g</div>
+                  </div>
+                  <div className="p-4 rounded-lg bg-zinc-900 border border-zinc-800">
+                    <div className="text-xs text-zinc-400 font-semibold uppercase">3-Event Rolling Moving Average</div>
+                    <div className="text-2xl font-bold text-white mt-1">MAE: ±₹{prediction?.baseline_benchmarks?.sma_3_event?.mae_inr_per_g || 135.89}/g</div>
+                    <div className="text-xs text-zinc-500 mt-1">RMSE: ₹{prediction?.baseline_benchmarks?.sma_3_event?.rmse_inr_per_g || 175.07}/g</div>
+                  </div>
                 </div>
-                <div className="p-4 rounded border border-zinc-800/60 bg-zinc-900/30">
-                  <span className="text-xs font-semibold text-zinc-300 block mb-1">Arbitrage & Tariff Spread</span>
-                  <span className="text-[11px] text-zinc-500 block leading-relaxed">
-                    Domestic retail premium over converted international spot price.
-                  </span>
-                </div>
-                <div className="p-4 rounded border border-zinc-800/60 bg-zinc-900/30">
-                  <span className="text-xs font-semibold text-zinc-300 block mb-1">News Intelligence</span>
-                  <span className="text-[11px] text-zinc-500 block leading-relaxed">
-                    FinBERT sentiment from global macro, central-bank buying, and geopolitical events.
-                  </span>
-                </div>
+              </div>
+
+              {/* Model Specifications */}
+              <div className="mt-6 p-4 rounded-lg bg-zinc-900/60 border border-zinc-800 text-xs text-zinc-400 space-y-1.5">
+                <div className="font-semibold text-zinc-200">Pipeline Invariants & Architecture:</div>
+                <div>• Target: <strong className="text-zinc-200">next_event_gold</strong> (Next calendar trading event published rate)</div>
+                <div>• Lookback Window: Strict cutoff enforcing publication date &lt;= event time (zero lookahead leakage)</div>
+                <div>• Features: Converted spot parity, daily forex returns, domestic premium spread, FinBERT 24h sentiment mean & std</div>
               </div>
             </div>
           </div>
         )}
 
-        {/* NEWS INTELLIGENCE TAB */}
+        {/* ========================================================================= */}
+        {/* TAB 5: NEWS INTELLIGENCE                                                  */}
+        {/* ========================================================================= */}
         {activeTab === "news" && (
           <div className="space-y-6">
-            <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/40">
-              <h2 className="text-lg font-bold text-white mb-1">Bullion Market News Intelligence</h2>
-              <p className="text-xs text-zinc-400 mb-6">
-                Real-time financial articles analyzed via FinBERT for sentiment polarity and gold market relevance.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">Financial News Intelligence Feed</h2>
+                <p className="text-xs text-zinc-400 mt-0.5">NLP-analyzed financial news desks scored via ProsusAI FinBERT</p>
+              </div>
 
-              <div className="space-y-3">
-                {news.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-lg border border-zinc-800/80 bg-zinc-900/20 hover:bg-zinc-800/20 transition flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"
+              {/* Filters */}
+              <div className="flex space-x-1 bg-zinc-900 p-1 rounded-lg border border-zinc-800 text-xs">
+                {["ALL", "BULLISH", "BEARISH", "GOLD_ONLY"].map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setNewsFilter(filter)}
+                    className={`px-3 py-1 rounded font-medium transition-colors ${
+                      newsFilter === filter ? "bg-amber-500 text-black font-semibold" : "text-zinc-400 hover:text-zinc-200"
+                    }`}
                   >
-                    <div className="space-y-1 max-w-3xl">
-                      <a
-                        href={item.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-medium text-zinc-200 hover:text-amber-400 transition"
-                      >
-                        {item.title}
-                      </a>
-                      <div className="flex items-center gap-3 text-[10px] text-zinc-500 font-mono">
-                        <span>{item.source}</span>
-                        <span>•</span>
-                        <span>{new Date(item.published_at).toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 font-mono text-[10px]">
-                      <span
-                        className={`px-2 py-0.5 rounded font-semibold ${
-                          item.sentiment_label === "positive"
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                            : item.sentiment_label === "negative"
-                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                            : "bg-zinc-800 text-zinc-400"
-                        }`}
-                      >
-                        {item.sentiment_label.toUpperCase()} ({item.sentiment_score > 0 ? "+" : ""}
-                        {item.sentiment_score.toFixed(2)})
-                      </span>
-                      {item.is_gold_relevant && (
-                        <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                          GOLD RELEVANT
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                    {filter}
+                  </button>
                 ))}
               </div>
             </div>
+
+            <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl divide-y divide-zinc-800/60">
+              {filteredNews.length === 0 ? (
+                <div className="p-8 text-center text-zinc-500 text-xs">No articles matching active filter criteria.</div>
+              ) : (
+                filteredNews.map((item) => (
+                  <div key={item.id} className="p-4 hover:bg-zinc-800/20 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded font-semibold text-xs ${
+                          item.sentiment_label === "POSITIVE"
+                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                            : item.sentiment_label === "NEGATIVE"
+                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+                            : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                        }`}>
+                          {item.sentiment_label === "POSITIVE" ? "BULLISH" : item.sentiment_label === "NEGATIVE" ? "BEARISH" : "NEUTRAL"}
+                        </span>
+                        {item.is_gold_relevant && (
+                          <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs">
+                            Gold Relevant
+                          </span>
+                        )}
+                        <span className="text-zinc-500">{item.source}</span>
+                      </div>
+                      <h4 className="text-sm font-semibold text-zinc-100 hover:text-amber-400 transition-colors">
+                        <a href={item.url} target="_blank" rel="noopener noreferrer">
+                          {item.title}
+                        </a>
+                      </h4>
+                    </div>
+                    <div className="text-zinc-500 whitespace-nowrap text-xs">
+                      {new Date(item.published_at).toLocaleDateString()} {new Date(item.published_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
 
-        {/* ALERTS TAB */}
-        {activeTab === "alerts" && (
+        {/* ========================================================================= */}
+        {/* TAB 6: RESEARCH & HISTORICAL ANALYSIS                                     */}
+        {/* ========================================================================= */}
+        {activeTab === "research" && (
           <div className="space-y-6">
-            <div className="p-6 rounded-xl border border-zinc-800 bg-zinc-900/40 space-y-6">
-              <div>
-                <h2 className="text-lg font-bold text-white">Bullion Rate & Spread Alerts</h2>
-                <p className="text-xs text-zinc-400">
-                  Configure real-time in-app notifications for price barriers, domestic premium spikes, and volatility.
-                </p>
-              </div>
+            <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl p-6">
+              <h2 className="text-xl font-bold text-white">Quantitative Precious Metals Research</h2>
+              <p className="text-xs text-zinc-400 mt-1">Historical rates, parity correlation, and disparity distributions</p>
 
-              {/* Add Alert Form */}
-              <form onSubmit={handleCreateAlert} className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-lg bg-zinc-950/60 border border-zinc-800 text-xs">
-                <div>
-                  <label className="block text-zinc-400 mb-1">Trigger Condition</label>
-                  <select
-                    value={newAlertType}
-                    onChange={(e) => setNewAlertType(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-200"
-                  >
-                    <option value="PRICE_ABOVE">Gold Price Above (₹/g)</option>
-                    <option value="PRICE_BELOW">Gold Price Below (₹/g)</option>
-                    <option value="PREMIUM_ABOVE">Domestic Premium Above (%)</option>
-                    <option value="DAILY_CHANGE_PCT">24h Volatility Above (%)</option>
-                  </select>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800">
+                  <div className="text-xs text-zinc-400 uppercase font-semibold">Gold / Silver Ratio</div>
+                  <div className="text-2xl font-bold text-white mt-1">{overview?.derived?.global_gold_silver_ratio || "59.1"}</div>
+                  <div className="text-xs text-zinc-500 mt-1">Ounces of silver needed to purchase 1 oz of gold</div>
                 </div>
-                <div>
-                  <label className="block text-zinc-400 mb-1">Threshold Value</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={newAlertThreshold}
-                    onChange={(e) => setNewAlertThreshold(e.target.value)}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-zinc-200 font-mono"
-                    required
-                  />
+                <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800">
+                  <div className="text-xs text-zinc-400 uppercase font-semibold">Total Verified Market Events</div>
+                  <div className="text-2xl font-bold text-amber-400 mt-1">35 Events</div>
+                  <div className="text-xs text-zinc-500 mt-1">Logged from KJPL Ahmedabad wholesale spot</div>
                 </div>
-                <div className="flex items-end">
-                  <button
-                    type="submit"
-                    className="w-full py-2 rounded bg-amber-500 font-semibold text-black hover:bg-amber-400 transition"
-                  >
-                    Set Alert Rule
-                  </button>
+                <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800">
+                  <div className="text-xs text-zinc-400 uppercase font-semibold">Analyzed News Sample</div>
+                  <div className="text-2xl font-bold text-zinc-200 mt-1">2,735 Articles</div>
+                  <div className="text-xs text-zinc-500 mt-1">1,065 bullion-relevant FinBERT vectors</div>
                 </div>
-              </form>
-
-              {/* Active Alerts */}
-              <div className="space-y-2">
-                <h3 className="text-xs font-semibold tracking-wide uppercase text-zinc-400">Active Alert Rules ({alerts.length})</h3>
-                {alerts.length === 0 ? (
-                  <p className="text-xs text-zinc-500 py-4">No alert rules active.</p>
-                ) : (
-                  alerts.map((al) => (
-                    <div
-                      key={al.id}
-                      className="p-3 rounded border border-zinc-800 bg-zinc-900/20 flex justify-between items-center text-xs"
-                    >
-                      <div>
-                        <span className="font-mono font-bold text-amber-400">{al.alert_type}</span>{" "}
-                        <span className="text-zinc-300 font-mono">
-                          {al.alert_type.includes("PREMIUM") || al.alert_type.includes("CHANGE")
-                            ? `${al.threshold}%`
-                            : `₹${al.threshold.toLocaleString("en-IN")}`}
-                        </span>
-                        {al.notes && <span className="block text-[11px] text-zinc-500">{al.notes}</span>}
-                      </div>
-                      <button
-                        onClick={() => handleDeleteAlert(al.id)}
-                        className="text-zinc-500 hover:text-rose-400 text-xs"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ))
-                )}
               </div>
             </div>
           </div>
         )}
+
+        {/* ========================================================================= */}
+        {/* TAB 7: ALERTS                                                             */}
+        {/* ========================================================================= */}
+        {activeTab === "alerts" && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white">Price & Premium Alert Rules</h2>
+                <p className="text-xs text-zinc-400 mt-0.5">Automated monitoring triggers for spot rates and domestic premium breaches</p>
+              </div>
+              <button
+                onClick={() => setIsAddAlertOpen(true)}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold rounded-lg transition-all"
+              >
+                + Create Trigger Rule
+              </button>
+            </div>
+
+            <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl divide-y divide-zinc-800/60">
+              {alerts.length === 0 ? (
+                <div className="p-8 text-center text-zinc-500 text-xs">No active alert triggers configured.</div>
+              ) : (
+                alerts.map((al) => (
+                  <div key={al.id} className="p-4 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="font-semibold text-white">{al.target_metric} {al.alert_type} {al.threshold}</span>
+                      {al.notes && <p className="text-zinc-500 text-xs mt-0.5">{al.notes}</p>}
+                    </div>
+                    <button
+                      onClick={() => handleDeleteAlert(al.id)}
+                      className="text-rose-400 hover:text-rose-300 text-xs px-2 py-1"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 8: SETTINGS                                                           */}
+        {/* ========================================================================= */}
+        {activeTab === "settings" && (
+          <div className="space-y-6">
+            <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl p-6">
+              <h2 className="text-xl font-bold text-white">Platform Settings & Security</h2>
+              <p className="text-xs text-zinc-400 mt-1">Configure user authentication, reference benchmarks, and operational parameters</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1">Tenant User Identifier</label>
+                    <input
+                      type="text"
+                      value={userId}
+                      onChange={(e) => setUserId(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-white"
+                      placeholder="e.g. owner or user_id"
+                    />
+                    <p className="text-xs text-zinc-500 mt-1">Binds portfolio records to this private vault partition.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-300 mb-1">Server Authorization Token (Optional)</label>
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-white"
+                      placeholder="Enter GOLDSENSE_API_KEY if auth enabled"
+                    />
+                    <p className="text-xs text-zinc-500 mt-1">Used for Bearer authorization against production backend.</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800 text-xs text-zinc-400 space-y-2">
+                  <div className="font-semibold text-zinc-200">System Information:</div>
+                  <div>• Branch: <code className="text-amber-400">develop</code></div>
+                  <div>• Primary Rate Benchmark: <code className="text-zinc-200">KJPL Ahmedabad 999 MJDTA</code></div>
+                  <div>• Conversion Standard: <code className="text-zinc-200">1 Troy Oz ≡ 31.1034768 g</code></div>
+                  <div>• Rate Refresh Debounce: <code className="text-zinc-200">60 Seconds</code></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
+
+      {/* ========================================================================= */}
+      {/* MODAL: ADD HOLDING                                                        */}
+      {/* ========================================================================= */}
+      {isAddHoldingOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-4">Add Bullion Holding</h3>
+            <form onSubmit={handleCreateHolding} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-zinc-400 mb-1">Precious Metal</label>
+                  <select
+                    value={holdingForm.metal_type}
+                    onChange={(e) => setHoldingForm({ ...holdingForm, metal_type: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  >
+                    <option value="GOLD">Gold</option>
+                    <option value="SILVER">Silver</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-zinc-400 mb-1">Purity (Fineness)</label>
+                  <select
+                    value={holdingForm.purity}
+                    onChange={(e) => setHoldingForm({ ...holdingForm, purity: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  >
+                    <option value="0.9999">999.9 (24K Minted Bar)</option>
+                    <option value="0.999">999.0 (24K Standard)</option>
+                    <option value="0.995">995.0 (24K Bullion)</option>
+                    <option value="0.916">916.0 (22K Jewelry)</option>
+                    <option value="0.750">750.0 (18K Jewelry)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 mb-1">Product Description</label>
+                <input
+                  type="text"
+                  required
+                  value={holdingForm.product_name}
+                  onChange={(e) => setHoldingForm({ ...holdingForm, product_name: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-zinc-400 mb-1">Gross Weight</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    value={holdingForm.gross_weight}
+                    onChange={(e) => setHoldingForm({ ...holdingForm, gross_weight: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 mb-1">Unit</label>
+                  <select
+                    value={holdingForm.weight_unit}
+                    onChange={(e) => setHoldingForm({ ...holdingForm, weight_unit: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  >
+                    <option value="g">Grams (g)</option>
+                    <option value="kg">Kilograms (kg)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-zinc-400 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={holdingForm.quantity}
+                    onChange={(e) => setHoldingForm({ ...holdingForm, quantity: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 mb-1">Total Cost in INR (Optional)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Leave empty if unknown"
+                    value={holdingForm.acquisition_cost_inr}
+                    onChange={(e) => setHoldingForm({ ...holdingForm, acquisition_cost_inr: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 mb-1">Notes / Vault Location</label>
+                <input
+                  type="text"
+                  value={holdingForm.notes}
+                  onChange={(e) => setHoldingForm({ ...holdingForm, notes: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAddHoldingOpen(false)}
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded font-bold"
+                >
+                  Save Holding
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: EDIT HOLDING                                                       */}
+      {/* ========================================================================= */}
+      {isEditHoldingOpen && editingHolding && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-4">Edit Bullion Holding #{editingHolding.id}</h3>
+            <form onSubmit={handleUpdateHolding} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-zinc-400 mb-1">Precious Metal</label>
+                  <select
+                    value={holdingForm.metal_type}
+                    onChange={(e) => setHoldingForm({ ...holdingForm, metal_type: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  >
+                    <option value="GOLD">Gold</option>
+                    <option value="SILVER">Silver</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-zinc-400 mb-1">Purity (Fineness)</label>
+                  <select
+                    value={holdingForm.purity}
+                    onChange={(e) => setHoldingForm({ ...holdingForm, purity: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  >
+                    <option value="0.9999">999.9 (24K Minted Bar)</option>
+                    <option value="0.999">999.0 (24K Standard)</option>
+                    <option value="0.995">995.0 (24K Bullion)</option>
+                    <option value="0.916">916.0 (22K Jewelry)</option>
+                    <option value="0.750">750.0 (18K Jewelry)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 mb-1">Product Description</label>
+                <input
+                  type="text"
+                  required
+                  value={holdingForm.product_name}
+                  onChange={(e) => setHoldingForm({ ...holdingForm, product_name: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-zinc-400 mb-1">Gross Weight</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    value={holdingForm.gross_weight}
+                    onChange={(e) => setHoldingForm({ ...holdingForm, gross_weight: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 mb-1">Unit</label>
+                  <select
+                    value={holdingForm.weight_unit}
+                    onChange={(e) => setHoldingForm({ ...holdingForm, weight_unit: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  >
+                    <option value="g">Grams (g)</option>
+                    <option value="kg">Kilograms (kg)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-zinc-400 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={holdingForm.quantity}
+                    onChange={(e) => setHoldingForm({ ...holdingForm, quantity: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 mb-1">Total Cost in INR</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Leave empty if unknown"
+                    value={holdingForm.acquisition_cost_inr}
+                    onChange={(e) => setHoldingForm({ ...holdingForm, acquisition_cost_inr: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 mb-1">Notes</label>
+                <input
+                  type="text"
+                  value={holdingForm.notes}
+                  onChange={(e) => setHoldingForm({ ...holdingForm, notes: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setIsEditHoldingOpen(false)}
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded font-bold"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: ADD ALERT                                                          */}
+      {/* ========================================================================= */}
+      {isAddAlertOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-4">Create Price Alert</h3>
+            <form onSubmit={handleCreateAlert} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-zinc-400 mb-1">Condition</label>
+                <select
+                  value={alertForm.alert_type}
+                  onChange={(e) => setAlertForm({ ...alertForm, alert_type: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                >
+                  <option value="PRICE_ABOVE">Spot Rate Above (&gt;)</option>
+                  <option value="PRICE_BELOW">Spot Rate Below (&lt;)</option>
+                  <option value="PREMIUM_ABOVE">Domestic Premium Above (&gt; %)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 mb-1">Threshold Value</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={alertForm.threshold}
+                  onChange={(e) => setAlertForm({ ...alertForm, threshold: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-zinc-400 mb-1">Notes (Optional)</label>
+                <input
+                  type="text"
+                  value={alertForm.notes}
+                  onChange={(e) => setAlertForm({ ...alertForm, notes: e.target.value })}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"
+                  placeholder="e.g. Target rebalancing point"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAddAlertOpen(false)}
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded font-bold"
+                >
+                  Create Alert
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

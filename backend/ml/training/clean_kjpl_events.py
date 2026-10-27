@@ -5,8 +5,9 @@ from pathlib import Path
 import pandas as pd
 
 
-INPUT_PATH = Path("data/kjpl/kjpl_rates.csv")
-OUTPUT_PATH = Path("backend/ml/data/processed/kjpl_events.csv")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+INPUT_PATH = PROJECT_ROOT / "data/kjpl/kjpl_rates.csv"
+OUTPUT_PATH = PROJECT_ROOT / "backend/ml/data/processed/kjpl_events.csv"
 
 IST = "Asia/Kolkata"
 

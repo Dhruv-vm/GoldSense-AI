@@ -189,6 +189,60 @@ class PortfolioService:
             return res.rowcount > 0
 
     @staticmethod
+    def get_historical_valuation(user_id: str = "default_user") -> list[dict[str, Any]]:
+        """
+        Evaluate user's current holdings across historical KJPL rate events.
+        Produces an auditable time-series of historical portfolio valuations.
+        """
+        init_database()
+        holdings = PortfolioService.list_holdings(user_id=user_id)
+        if not holdings:
+            return []
+
+        from app.services.data_service import KJPL_CSV
+        if not KJPL_CSV.exists():
+            return []
+
+        import csv
+        with KJPL_CSV.open("r", encoding="utf-8") as f:
+            kjpl_records = list(csv.DictReader(f))
+
+        history = []
+        for row in kjpl_records:
+            try:
+                gold_rate = float(row["gold_mjdta"])
+                silver_rate = float(row.get("silver_mjdta", 0.0)) if row.get("silver_mjdta") else 220.0
+                obs_date = row.get("observed_at", "")[:10]
+
+                total_val = 0.0
+                gold_val = 0.0
+                silver_val = 0.0
+
+                for h in holdings:
+                    qty = h["quantity"]
+                    if h["metal_type"] == "GOLD":
+                        val = round(h["fine_weight_grams"] * gold_rate * qty, 2)
+                        gold_val += val
+                    else:
+                        val = round(h["fine_weight_grams"] * silver_rate * qty, 2)
+                        silver_val += val
+                    total_val += val
+
+                history.append({
+                    "date": obs_date,
+                    "observed_at": row.get("observed_at"),
+                    "gold_rate_inr": gold_rate,
+                    "silver_rate_inr": silver_rate,
+                    "total_valuation_inr": round(total_val, 2),
+                    "gold_valuation_inr": round(gold_val, 2),
+                    "silver_valuation_inr": round(silver_val, 2),
+                })
+            except (ValueError, KeyError):
+                continue
+
+        return history
+
+    @staticmethod
     def get_portfolio_summary(user_id: str = "default_user") -> dict[str, Any]:
         holdings = PortfolioService.list_holdings(user_id=user_id)
         gold_rate, silver_rate = get_current_benchmark_rates()

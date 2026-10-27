@@ -1,9 +1,16 @@
 # Security, Privacy & Multi-User Isolation
 
-## 1. Multi-Tenant User Isolation
-Personal bullion holdings and net worth data represent highly sensitive personal financial information. GoldSense AI enforces multi-user isolation by design:
+## 1. Multi-Tenant User Isolation & Server-Side Authorization
+Personal bullion holdings and net worth data represent highly sensitive personal financial information. GoldSense AI enforces server-side authorization:
+- `app.core.auth.get_current_user`: Server-side dependency that extracts and validates identity.
+- In production / authenticated environments (`AUTH_ENABLED=true`):
+  - Requires `Authorization: Bearer <token>` or `X-API-Key`.
+  - The server verifies the secret token against `GOLDSENSE_API_KEY`.
+  - Unauthenticated requests or invalid tokens are rejected with `HTTP 401 Unauthorized` or `HTTP 403 Forbidden`.
+  - Caller-supplied user IDs alone are never trusted as proof of identity.
+- In single-user personal mode (`AUTH_ENABLED=false`):
+  - Binds requests to the vault owner (`owner`).
 - Every record in `portfolio_holdings` and `alert_rules` requires an indexed `user_id`.
-- The API extracts the caller's tenant identifier via standard authentication middleware or the `X-User-ID` header.
 - Cross-user queries are prevented at the database service layer (e.g., `filter(PortfolioHolding.user_id == user_id)` is applied to all CRUD queries).
 - A user cannot read, update, or delete another user's holdings; attempts return `HTTP 404 Not Found`.
 

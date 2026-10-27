@@ -34,6 +34,48 @@ def init_database() -> None:
         print(f"[DATA SERVICE] Warning creating tables: {e}")
 
 
+def get_market_trading_status() -> dict[str, Any]:
+    """
+    Evaluate trading session status for both domestic Indian spot bullion
+    and international COMEX futures / global forex.
+    """
+    now_ist = datetime.now(IST)
+    weekday = now_ist.weekday()  # Monday is 0, Sunday is 6
+    hour = now_ist.hour
+    minute = now_ist.minute
+
+    # Indian Physical Market (KJPL / Ahmedabad spot)
+    if weekday == 6:  # Sunday
+        indian_status = "SUNDAY_CLOSED"
+        indian_desc = "Physical bullion market is closed on Sundays."
+    elif 10 <= hour < 19:
+        indian_status = "OPEN"
+        indian_desc = "Physical bullion market active (10:00 AM - 7:00 PM IST)."
+    else:
+        indian_status = "AFTER_HOURS"
+        indian_desc = "Physical bullion market after-hours."
+
+    # US COMEX / Global Forex Market
+    # COMEX closed Saturday 02:30 IST to Monday 03:30 IST
+    if (weekday == 5 and (hour > 2 or (hour == 2 and minute >= 30))) or weekday == 6 or (weekday == 0 and (hour < 3 or (hour == 3 and minute < 30))):
+        global_status = "WEEKEND_CLOSED"
+        global_desc = "COMEX & global forex closed for weekend."
+    elif 3 <= hour < 4:
+        global_status = "DAILY_SETTLEMENT_BREAK"
+        global_desc = "CME daily maintenance & settlement pause."
+    else:
+        global_status = "OPEN"
+        global_desc = "Global precious metals futures & forex active."
+
+    return {
+        "indian_physical_market": indian_status,
+        "indian_physical_description": indian_desc,
+        "global_futures_market": global_status,
+        "global_futures_description": global_desc,
+        "server_time_ist": now_ist.strftime("%Y-%m-%d %H:%M:%S IST"),
+    }
+
+
 def get_freshness_status(observed_at: datetime) -> str:
     """
     Evaluate honest data freshness based on elapsed time from observation:
@@ -179,6 +221,7 @@ def get_market_overview() -> dict[str, Any]:
             "conversion_factor": TROY_OUNCE_GRAMS,
         },
         "overall_freshness": "FRESH" if kjpl["freshness"] == "FRESH" and market["freshness"] == "FRESH" else "DELAYED",
+        "trading_status": get_market_trading_status(),
     }
 
 

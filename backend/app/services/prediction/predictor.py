@@ -59,6 +59,18 @@ def get_prediction_status() -> dict:
     market = overview.get("market", {})
     kjpl = overview.get("kjpl", {})
 
+    # Load baseline benchmarks if available
+    eval_report_path = PROJECT_ROOT / "backend/ml/data/processed/evaluation_report.json"
+    baselines = {}
+    if eval_report_path.exists():
+        try:
+            import json
+            with eval_report_path.open("r", encoding="utf-8") as rf:
+                rep_data = json.load(rf)
+                baselines = rep_data.get("baseline_benchmarks", {})
+        except Exception:
+            pass
+
     if not models_available() or sample_count < MIN_REQUIRED_SAMPLES:
         return {
             "status": "EXPERIMENTAL_DATA_COLLECTION",
@@ -69,6 +81,7 @@ def get_prediction_status() -> dict:
                 "required_samples": MIN_REQUIRED_SAMPLES,
                 "progress_pct": round((sample_count / MIN_REQUIRED_SAMPLES) * 100, 1),
             },
+            "baseline_benchmarks": baselines,
             "current_macro_snapshot": {
                 "usdinr": market.get("usdinr"),
                 "xauusd": market.get("xauusd"),
