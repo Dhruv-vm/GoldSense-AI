@@ -42,8 +42,11 @@ class PortfolioService:
                 metal = h.metal_type.upper()
                 rate_per_gram = gold_rate if metal == "GOLD" else silver_rate
                 
-                # Valuation based on fine metal weight * benchmark rate * quantity
-                current_valuation = round(h.fine_weight_grams * rate_per_gram * h.quantity, 2)
+                # Reconciled benchmark valuation:
+                # Rate is quoted for 0.999 benchmark purity.
+                # Valuation = Gross Weight * Rate * (Purity / 0.999) * Quantity
+                benchmark_purity = 0.999
+                current_valuation = round(h.gross_weight_grams * (h.purity / benchmark_purity) * rate_per_gram * h.quantity, 2)
                 
                 gain_loss_inr = None
                 gain_loss_pct = None
@@ -80,8 +83,10 @@ class PortfolioService:
 
         product_name = str(data.get("product_name", "Bullion Item")).strip()
         purity = float(data.get("purity", 0.999))
+        if purity > 1.0:
+            purity = round(purity / 1000.0, 5)
         if purity <= 0.0 or purity > 1.0:
-            raise ValueError(f"Invalid purity: {purity}. Must be between 0.0 and 1.0.")
+            raise ValueError(f"Invalid purity: {purity}. Must be between 0.0 and 1.0 (or 0 to 1000 millesimal).")
 
         unit = str(data.get("weight_unit", "g")).lower()
         raw_weight = float(data.get("gross_weight", 0.0))
@@ -147,6 +152,8 @@ class PortfolioService:
                 holding.product_name = str(data["product_name"]).strip()
             if "purity" in data:
                 p = float(data["purity"])
+                if p > 1.0:
+                    p = round(p / 1000.0, 5)
                 if 0.0 < p <= 1.0:
                     holding.purity = p
             if "gross_weight" in data:
@@ -220,11 +227,12 @@ class PortfolioService:
 
                 for h in holdings:
                     qty = h["quantity"]
+                    benchmark_purity = 0.999
                     if h["metal_type"] == "GOLD":
-                        val = round(h["fine_weight_grams"] * gold_rate * qty, 2)
+                        val = round(h["gross_weight_grams"] * (h["purity"] / benchmark_purity) * gold_rate * qty, 2)
                         gold_val += val
                     else:
-                        val = round(h["fine_weight_grams"] * silver_rate * qty, 2)
+                        val = round(h["gross_weight_grams"] * (h["purity"] / benchmark_purity) * silver_rate * qty, 2)
                         silver_val += val
                     total_val += val
 

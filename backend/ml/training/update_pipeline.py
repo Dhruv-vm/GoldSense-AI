@@ -78,12 +78,15 @@ def run_full_pipeline_update() -> dict:
 
     end_time = datetime.now(timezone.utc)
     duration = (end_time - start_time).total_seconds()
+    all_success = all(v.get("status") == "SUCCESS" for v in stages.values()) and len(stages) == 5
+    overall_status = "SUCCESS" if all_success else "FAILED"
+
     print("=" * 70)
-    print(f"[PIPELINE UPDATE] Completed in {duration:.2f} seconds.")
+    print(f"[PIPELINE UPDATE] Finished with status: {overall_status} in {duration:.2f} seconds.")
     print("=" * 70)
 
     return {
-        "status": "SUCCESS",
+        "status": overall_status,
         "started_at": start_time.isoformat(),
         "completed_at": end_time.isoformat(),
         "duration_seconds": round(duration, 2),
@@ -92,4 +95,6 @@ def run_full_pipeline_update() -> dict:
 
 
 if __name__ == "__main__":
-    run_full_pipeline_update()
+    result = run_full_pipeline_update()
+    if result["status"] != "SUCCESS":
+        sys.exit(1)

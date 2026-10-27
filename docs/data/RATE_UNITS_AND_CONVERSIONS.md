@@ -5,8 +5,8 @@
 - **Troy Ounce (oz t)**: Standard unit for international precious metal trading.
   $$1 \text{ oz t} \equiv 31.1034768 \text{ grams}$$
   *(Caution: Do not use the avoirdupois ounce, which equals $28.3495\text{ g}$).*
-- **Gram (g)**: Standard retail and wholesale unit in India for gold.
-- **Kilogram (kg)**: Standard wholesale unit in India for silver ($1\text{ kg} = 1000\text{ g}$).
+- **Gram (g)**: Standard retail and wholesale unit in India for gold. KJPL records both Gold (`gold_mjdta` ~₹13,135/g) and Silver (`silver_mjdta` ~₹220/g) in **INR per gram**.
+- **Kilogram (kg)**: Standard wholesale physical delivery bar size for silver ($1\text{ kg} = 1000\text{ g} \approx ₹220,000$).
 
 ---
 

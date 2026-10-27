@@ -9,9 +9,11 @@ Given a holding with gross weight $W$ (grams), purity $P$ (parts per thousand, e
 $$\text{Current Market Value} = W \times Q \times R_{\text{KJPL}} \times \left(\frac{P}{999}\right)$$
 
 ### Silver Valuation Formula
-Given current spot silver rate $R_{\text{silver}}$ in INR per kilogram:
+KJPL quotes physical silver in INR per gram (e.g. ₹220.0/g, representing ₹220,000/kg). Given current spot silver rate $R_{\text{silver}}$ in INR per gram of 999 silver:
 
-$$\text{Current Market Value} = \left(\frac{W \times Q}{1000}\right) \times R_{\text{silver}} \times \left(\frac{P}{999}\right)$$
+$$\text{Current Market Value} = W \times Q \times R_{\text{silver}} \times \left(\frac{P}{0.999}\right)$$
+
+*(Or equivalently if referencing per-kilogram wholesale rates: $\frac{W \times Q}{1000} \times R_{\text{silver\_per\_kg}} \times \frac{P}{0.999}$).*
 
 ---
 
