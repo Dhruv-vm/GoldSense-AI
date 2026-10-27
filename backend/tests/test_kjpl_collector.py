@@ -136,9 +136,9 @@ def test_kjpl_workflow_yaml_and_cron_conversions():
         "38 0 * * *",  # 06:08 AM IST (targets ~10:15 - 10:30 AM IST after ~4h queue backlog)
         "8 1 * * *",   # 06:38 AM IST (targets ~10:45 - 11:00 AM IST after ~4h queue backlog)
         "38 1 * * *",  # 07:08 AM IST (targets ~11:15 - 11:30 AM IST after ~4h queue backlog)
-        "8 9 * * *",   # 02:38 PM IST (targets ~05:15 - 05:40 PM IST after ~3h queue backlog)
-        "38 9 * * *",  # 03:08 PM IST (targets ~05:45 - 06:10 PM IST after ~3h queue backlog)
-        "8 10 * * *",  # 03:38 PM IST (targets ~06:15 - 06:40 PM IST after ~3h queue backlog)
+        "38 7 * * *",  # 01:08 PM IST (targets ~05:15 - 05:45 PM IST after ~4-4.5h queue backlog)
+        "8 8 * * *",   # 01:38 PM IST (targets ~05:45 - 06:15 PM IST after ~4-4.5h queue backlog)
+        "38 8 * * *",  # 02:08 PM IST (targets ~06:15 - 06:45 PM IST after ~4-4.5h queue backlog)
     ]
 
     assert crons == expected_crons, f"Crons must match required 6 schedules: {crons}"
@@ -155,12 +155,12 @@ def test_kjpl_workflow_yaml_and_cron_conversions():
             assert ist_time.strftime("%I:%M %p") == "06:38 AM"
         elif cron_expr == "38 1 * * *":
             assert ist_time.strftime("%I:%M %p") == "07:08 AM"
-        elif cron_expr == "8 9 * * *":
-            assert ist_time.strftime("%I:%M %p") == "02:38 PM"
-        elif cron_expr == "38 9 * * *":
-            assert ist_time.strftime("%I:%M %p") == "03:08 PM"
-        elif cron_expr == "8 10 * * *":
-            assert ist_time.strftime("%I:%M %p") == "03:38 PM"
+        elif cron_expr == "38 7 * * *":
+            assert ist_time.strftime("%I:%M %p") == "01:08 PM"
+        elif cron_expr == "8 8 * * *":
+            assert ist_time.strftime("%I:%M %p") == "01:38 PM"
+        elif cron_expr == "38 8 * * *":
+            assert ist_time.strftime("%I:%M %p") == "02:08 PM"
 
 
 def test_collect_with_mocked_response(tmp_path: Path, monkeypatch):

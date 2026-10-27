@@ -15,10 +15,10 @@ on:
     - cron: '8 1 * * *'    # 06:38 AM IST scheduled -> executes ~10:45 - 11:00 AM IST (Morning primary)
     - cron: '38 1 * * *'   # 07:08 AM IST scheduled -> executes ~11:15 - 11:30 AM IST (Morning late backup)
 
-    # Evening target window (~05:15 PM - 06:30 PM IST) - pre-shifted by ~3h:
-    - cron: '8 9 * * *'    # 02:38 PM IST scheduled -> executes ~05:15 - 05:40 PM IST (Evening early backup)
-    - cron: '38 9 * * *'   # 03:08 PM IST scheduled -> executes ~05:45 - 06:10 PM IST (Evening primary)
-    - cron: '8 10 * * *'   # 03:38 PM IST scheduled -> executes ~06:15 - 06:40 PM IST (Evening late backup)
+    # Evening target window (~05:15 PM - 06:40 PM IST) - pre-shifted by ~4-4.5h queue delay:
+    - cron: '38 7 * * *'   # 01:08 PM IST scheduled -> executes ~05:15 - 05:45 PM IST (Evening early backup)
+    - cron: '8 8 * * *'    # 01:38 PM IST scheduled -> executes ~05:45 - 06:15 PM IST (Evening primary)
+    - cron: '38 8 * * *'   # 02:08 PM IST scheduled -> executes ~06:15 - 06:45 PM IST (Evening late backup)
 
   workflow_dispatch:
 
