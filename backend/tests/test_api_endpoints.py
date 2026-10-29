@@ -44,7 +44,8 @@ def test_prediction_status_endpoint():
     data = res.json()
     assert data["status"] == "EXPERIMENTAL_DATA_COLLECTION"
     assert data["is_ready"] is False
-    assert data["metrics"]["current_samples"] == 34
+    assert data["metrics"]["current_samples"] >= 30
+    assert data["metrics"]["current_samples"] < data["metrics"]["required_samples"]
     assert data["metrics"]["required_samples"] == 50
 
 

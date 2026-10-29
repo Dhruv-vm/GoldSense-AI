@@ -41,5 +41,6 @@ jobs:
             echo "No new market data to commit."
           else
             git commit -m "data: collect market rates"
-            git push
+            git pull --rebase origin develop
+            git push origin develop
           fi
