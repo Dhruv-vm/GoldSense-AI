@@ -78,12 +78,13 @@ def get_market_trading_status() -> dict[str, Any]:
     }
 
 
-def get_freshness_status(observed_at: datetime) -> str:
+def get_freshness_details(observed_at: datetime) -> dict[str, Any]:
     """
     Evaluate honest data freshness based on elapsed time from observation:
       - FRESH:   < 4 hours
       - DELAYED: 4 - 24 hours
       - STALE:   > 24 hours
+    Returns status, numerical age in hours, and human-readable age string.
     """
     now_utc = datetime.now(timezone.utc)
     if observed_at.tzinfo is None:
@@ -91,13 +92,38 @@ def get_freshness_status(observed_at: datetime) -> str:
     else:
         obs_utc = observed_at.astimezone(timezone.utc)
 
-    age_hours = (now_utc - obs_utc).total_seconds() / 3600.0
-    if age_hours < 4.0:
-        return "FRESH"
-    elif age_hours < 24.0:
-        return "DELAYED"
+    age_seconds = max(0.0, (now_utc - obs_utc).total_seconds())
+    age_hours = round(age_seconds / 3600.0, 1)
+
+    if age_seconds < 3600:
+        mins = int(age_seconds / 60)
+        age_display = f"{mins}m ago"
+    elif age_seconds < 86400:
+        hours = int(age_seconds / 3600)
+        mins = int((age_seconds % 3600) / 60)
+        age_display = f"{hours}h {mins}m ago" if mins > 0 else f"{hours}h ago"
     else:
-        return "STALE"
+        days = int(age_seconds / 86400)
+        hours = int((age_seconds % 86400) / 3600)
+        age_display = f"{days}d {hours}h ago"
+
+    if age_hours < 4.0:
+        status = "FRESH"
+    elif age_hours < 24.0:
+        status = "DELAYED"
+    else:
+        status = "STALE"
+
+    return {
+        "status": status,
+        "age_hours": age_hours,
+        "age_display": age_display,
+    }
+
+
+def get_freshness_status(observed_at: datetime) -> str:
+    """Evaluate honest data freshness status: FRESH, DELAYED, or STALE."""
+    return get_freshness_details(observed_at)["status"]
 
 
 def get_latest_kjpl_from_csv() -> dict[str, Any] | None:
@@ -123,6 +149,8 @@ def get_latest_kjpl_from_csv() -> dict[str, Any] | None:
         change_inr = round(gold - prev_gold, 2)
         change_pct = round((change_inr / prev_gold) * 100, 2) if prev_gold > 0 else 0.0
 
+        kjpl_freshness = get_freshness_details(obs_time)
+
         return {
             "source": "KJPL (MJDTA Benchmark)",
             "gold_mjdta": gold,
@@ -133,7 +161,9 @@ def get_latest_kjpl_from_csv() -> dict[str, Any] | None:
             "unit": "gram",
             "change_24h_inr": change_inr,
             "change_24h_pct": change_pct,
-            "freshness": get_freshness_status(obs_time),
+            "freshness": kjpl_freshness["status"],
+            "age_hours": kjpl_freshness["age_hours"],
+            "age_display": kjpl_freshness["age_display"],
         }
 
 
@@ -162,6 +192,8 @@ def get_latest_market_from_csv() -> dict[str, Any] | None:
         xau_pct = round((xau_change / prev_xau) * 100, 2) if prev_xau > 0 else 0.0
         usdinr_change = round(usdinr - prev_usdinr, 4)
 
+        market_freshness = get_freshness_details(obs_time)
+
         return {
             "xauusd": xau,
             "xagusd": xag,
@@ -171,7 +203,9 @@ def get_latest_market_from_csv() -> dict[str, Any] | None:
             "xauusd_change_24h": xau_change,
             "xauusd_change_24h_pct": xau_pct,
             "usdinr_change_24h": usdinr_change,
-            "freshness": get_freshness_status(obs_time),
+            "freshness": market_freshness["status"],
+            "age_hours": market_freshness["age_hours"],
+            "age_display": market_freshness["age_display"],
         }
 
 
@@ -208,6 +242,14 @@ def get_market_overview() -> dict[str, Any]:
     global_gold_silver_ratio = round(xau / xag, 2) if xag > 0 else 0.0
     domestic_gold_silver_ratio = round(kjpl_gold / kjpl_silver, 2) if kjpl_silver > 0 else 0.0
 
+    # Overall freshness requires BOTH domestic bullion and global futures to be fresh
+    if kjpl["freshness"] == "STALE" or market["freshness"] == "STALE":
+        overall_freshness = "STALE"
+    elif kjpl["freshness"] == "DELAYED" or market["freshness"] == "DELAYED":
+        overall_freshness = "DELAYED"
+    else:
+        overall_freshness = "FRESH"
+
     return {
         "status": "SUCCESS",
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -222,7 +264,7 @@ def get_market_overview() -> dict[str, Any]:
             "domestic_gold_silver_ratio": domestic_gold_silver_ratio,
             "conversion_factor": TROY_OUNCE_GRAMS,
         },
-        "overall_freshness": "FRESH" if kjpl["freshness"] == "FRESH" and market["freshness"] == "FRESH" else "DELAYED",
+        "overall_freshness": overall_freshness,
         "trading_status": get_market_trading_status(),
     }
 

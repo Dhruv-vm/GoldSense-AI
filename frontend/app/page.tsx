@@ -11,6 +11,8 @@ interface KJPLData {
   change_24h_inr: number;
   change_24h_pct: number;
   freshness: string;
+  age_hours?: number;
+  age_display?: string;
 }
 
 interface MarketData {
@@ -23,6 +25,8 @@ interface MarketData {
   xauusd_change_24h_pct: number;
   usdinr_change_24h: number;
   freshness: string;
+  age_hours?: number;
+  age_display?: string;
 }
 
 interface DerivedData {
@@ -602,28 +606,108 @@ export default function GoldSenseDashboard() {
         {/* ========================================================================= */}
         {activeTab === "overview" && (
           <div className="space-y-6">
+            {/* Freshness Transparency Banner */}
+            {overview && (overview.kjpl?.freshness !== "FRESH" || overview.market?.freshness !== "FRESH") && (
+              <div className={`p-3.5 rounded-xl border text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                overview.overall_freshness === "STALE"
+                  ? "bg-rose-950/40 border-rose-800/60 text-rose-200"
+                  : "bg-amber-950/40 border-amber-800/60 text-amber-200"
+              }`}>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-base">{overview.overall_freshness === "STALE" ? "⚠️" : "🕒"}</span>
+                  <div>
+                    <div className="font-semibold text-zinc-100">
+                      {overview.kjpl?.freshness !== "FRESH" && overview.market?.freshness !== "FRESH"
+                        ? "Domestic Bullion and International Feeds Are Delayed"
+                        : overview.kjpl?.freshness !== "FRESH"
+                        ? "Domestic Indian Bullion Rate is Delayed (Off-Hours / Pending Publication)"
+                        : "International COMEX / Forex Feeds Are Delayed"}
+                    </div>
+                    <div className="text-xs text-zinc-300 mt-0.5">
+                      {overview.kjpl?.freshness !== "FRESH" && (
+                        <span>
+                          KJPL physical rate last observed <strong>{overview.kjpl?.age_display || overview.kjpl?.observed_at}</strong> ({overview.kjpl?.published_time || "N/A"}). Domestic spot rates publish twice daily during Indian market hours (~10:00 AM and ~05:00 PM IST).{" "}
+                        </span>
+                      )}
+                      {overview.market?.freshness !== "FRESH" && (
+                        <span>
+                          Global futures (COMEX GC=F) last observed <strong>{overview.market?.age_display || overview.market?.observed_at}</strong>.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                  <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${
+                    overview.kjpl?.freshness === "FRESH"
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                      : overview.kjpl?.freshness === "DELAYED"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                      : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                  }`}>
+                    KJPL: {overview.kjpl?.freshness} ({overview.kjpl?.age_display || "—"})
+                  </span>
+                  <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${
+                    overview.market?.freshness === "FRESH"
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                      : overview.market?.freshness === "DELAYED"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                      : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                  }`}>
+                    COMEX: {overview.market?.freshness} ({overview.market?.age_display || "—"})
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Top Market Bar */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
-                <div className="text-xs font-medium text-zinc-400 uppercase tracking-wider">KJPL Gold 999 (24K)</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-medium text-zinc-400 uppercase tracking-wider">KJPL Gold 999 (24K)</div>
+                  <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border ${
+                    overview?.kjpl?.freshness === "FRESH"
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                      : overview?.kjpl?.freshness === "DELAYED"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                      : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                  }`}>
+                    {overview?.kjpl?.freshness || "—"}
+                  </span>
+                </div>
                 <div className="text-2xl font-bold text-amber-400 mt-1">₹{overview?.kjpl?.gold_mjdta?.toLocaleString() || "—"} <span className="text-xs font-normal text-zinc-400">/ gram</span></div>
-                <div className="mt-2 text-xs flex items-center gap-1.5 text-zinc-400">
+                <div className="mt-2 text-xs flex items-center justify-between text-zinc-400">
                   <span className={overview?.kjpl?.change_24h_inr && overview.kjpl.change_24h_inr >= 0 ? "text-emerald-400" : "text-rose-400"}>
                     {overview?.kjpl?.change_24h_inr && overview.kjpl.change_24h_inr >= 0 ? "+" : ""}
-                    {overview?.kjpl?.change_24h_inr} ({overview?.kjpl?.change_24h_pct}%)
+                    {overview?.kjpl?.change_24h_inr} ({overview?.kjpl?.change_24h_pct}%) vs prev
                   </span>
-                  <span>vs prev</span>
+                  <span className="text-[11px] text-zinc-500 font-mono">
+                    {overview?.kjpl?.age_display || overview?.kjpl?.published_time || "N/A"}
+                  </span>
                 </div>
               </div>
 
               <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 shadow-sm">
-                <div className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Global Gold Spot (USD)</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Global Gold Spot (USD)</div>
+                  <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border ${
+                    overview?.market?.freshness === "FRESH"
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                      : overview?.market?.freshness === "DELAYED"
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                      : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                  }`}>
+                    {overview?.market?.freshness || "—"}
+                  </span>
+                </div>
                 <div className="text-2xl font-bold text-zinc-100 mt-1">${overview?.market?.xauusd?.toFixed(1) || "—"} <span className="text-xs font-normal text-zinc-400">/ troy oz</span></div>
-                <div className="mt-2 text-xs text-zinc-400 flex items-center gap-1.5">
+                <div className="mt-2 text-xs text-zinc-400 flex items-center justify-between">
                   <span className={overview?.market?.xauusd_change_24h && overview.market.xauusd_change_24h >= 0 ? "text-emerald-400" : "text-rose-400"}>
                     {overview?.market?.xauusd_change_24h && overview.market.xauusd_change_24h >= 0 ? "+" : ""}{overview?.market?.xauusd_change_24h} ({overview?.market?.xauusd_change_24h_pct}%)
                   </span>
-                  <span>COMEX GC=F</span>
+                  <span className="text-[11px] text-zinc-500 font-mono">
+                    COMEX • {overview?.market?.age_display || "Live"}
+                  </span>
                 </div>
               </div>
 

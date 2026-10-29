@@ -150,3 +150,59 @@ def test_prediction_status_includes_news_intelligence():
     assert "status" in news_intel
     assert "net_signal" in news_intel
     assert "market_vs_news_alignment" in news_intel
+
+
+def test_gold_impact_fed_hold_classified_as_us_fed_rates():
+    ref_time = datetime(2026, 10, 29, 12, 0, 0, tzinfo=timezone.utc)
+    pub_time = ref_time - timedelta(hours=2)
+    res = evaluate_gold_impact(
+        title="Gold Edges Lower After Fed Holds Rates With Limited Guidance",
+        published_at=pub_time,
+        reference_time=ref_time,
+    )
+    assert res["driver_category"] == GoldDriver.US_FED_RATES
+    assert res["directional_implication"] == "BEARISH"
+
+
+def test_gold_impact_oil_spike_classified_as_inflation():
+    ref_time = datetime(2026, 10, 29, 12, 0, 0, tzinfo=timezone.utc)
+    pub_time = ref_time - timedelta(hours=2)
+    res = evaluate_gold_impact(
+        title="Crude oil jumps 4% as energy prices surge, stoking inflation risks across major economies",
+        published_at=pub_time,
+        reference_time=ref_time,
+    )
+    assert res["driver_category"] == GoldDriver.INFLATION_MACRO
+    assert res["directional_implication"] == "BEARISH"
+
+
+def test_gold_impact_festive_demand_classified_as_physical():
+    ref_time = datetime(2026, 10, 29, 12, 0, 0, tzinfo=timezone.utc)
+    pub_time = ref_time - timedelta(hours=2)
+    res = evaluate_gold_impact(
+        title="Karwa Chauth today: Indian jewelry retailers report steady bullion demand",
+        published_at=pub_time,
+        reference_time=ref_time,
+    )
+    assert res["driver_category"] == GoldDriver.PHYSICAL_AND_CENTRAL_BANK
+    assert res["directional_implication"] == "BULLISH"
+
+
+def test_freshness_details_evaluation():
+    from app.services.data_service import get_freshness_details
+    now = datetime.now(timezone.utc)
+
+    # 1 hour ago -> FRESH
+    d_fresh = get_freshness_details(now - timedelta(hours=1))
+    assert d_fresh["status"] == "FRESH"
+    assert d_fresh["age_hours"] == 1.0
+
+    # 10 hours ago -> DELAYED
+    d_delayed = get_freshness_details(now - timedelta(hours=10))
+    assert d_delayed["status"] == "DELAYED"
+    assert d_delayed["age_hours"] == 10.0
+
+    # 30 hours ago -> STALE
+    d_stale = get_freshness_details(now - timedelta(hours=30))
+    assert d_stale["status"] == "STALE"
+    assert d_stale["age_hours"] == 30.0

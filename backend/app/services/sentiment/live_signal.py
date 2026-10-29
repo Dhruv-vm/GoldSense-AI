@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from datetime import datetime, timedelta, timezone
+import math
 from pathlib import Path
 from typing import Any
 
@@ -241,10 +242,11 @@ def get_live_news_intelligence(
             "representative_articles": cluster_representatives,
         }
 
-    # Aggregate directional weighted scores
+    # Aggregate directional weighted scores with source diversity and category saturation discounting
     bullish_weight = 0.0
     bearish_weight = 0.0
     mixed_weight = 0.0
+    source_counts: dict[str, int] = {}
     driver_counts: dict[str, int] = {}
     directional_counts = {"BULLISH": 0, "BEARISH": 0, "MIXED": 0, "UNCERTAIN": 0}
 
@@ -252,39 +254,60 @@ def get_live_news_intelligence(
         d = rep["directional_implication"]
         c = rep["confidence"]
         fw = rep["freshness_weight"]
-        weight = fw * CONFIDENCE_WEIGHTS.get(c, 0.5)
+        base_weight = fw * CONFIDENCE_WEIGHTS.get(c, 0.5)
+
+        # Source diversity discounting: Repeated articles from the same publisher receive
+        # diminishing marginal weight (1/sqrt(n)) so volume from one wire does not dominate consensus
+        src = (rep.get("source") or "Unknown").strip().lower()
+        source_counts[src] = source_counts.get(src, 0) + 1
+        src_n = source_counts[src]
+        source_discount = 1.0 / math.sqrt(src_n)
+
+        # Category saturation discounting: Multiple clusters in the exact same macro channel
+        # receive diminishing returns (1/sqrt(k)) requiring cross-asset breadth for high conviction
+        driver_cat = rep.get("driver_category") or "OTHER_MACRO"
+        driver_counts[driver_cat] = driver_counts.get(driver_cat, 0) + 1
+        cat_n = driver_counts[driver_cat]
+        cat_discount = 1.0 / math.sqrt(cat_n)
+
+        effective_weight = base_weight * source_discount * cat_discount
+        rep["effective_weight"] = round(effective_weight, 4)
+        rep["source_discount"] = round(source_discount, 3)
+        rep["category_discount"] = round(cat_discount, 3)
 
         directional_counts[d] = directional_counts.get(d, 0) + 1
-        driver_cat = rep["driver_category"]
-        driver_counts[driver_cat] = driver_counts.get(driver_cat, 0) + 1
 
         if d == "BULLISH":
-            bullish_weight += weight
+            bullish_weight += effective_weight
         elif d == "BEARISH":
-            bearish_weight += weight
+            bearish_weight += effective_weight
         else:
-            mixed_weight += weight
+            mixed_weight += effective_weight
 
     bullish_weight = round(bullish_weight, 3)
     bearish_weight = round(bearish_weight, 3)
     mixed_weight = round(mixed_weight, 3)
 
+    total_dir_weight = bullish_weight + bearish_weight
+    spread = abs(bullish_weight - bearish_weight)
+
     # Determine net directional consensus
-    if bullish_weight >= 1.25 * bearish_weight and bullish_weight >= 0.4:
+    # Cross-driver conflict: if both sides have meaningful evidence and spread is narrow (< 30% of total)
+    if bullish_weight >= 0.35 and bearish_weight >= 0.35 and (spread / max(total_dir_weight, 0.001)) < 0.30:
+        net_signal = "MIXED"
+    elif bullish_weight >= 1.25 * bearish_weight and bullish_weight >= 0.35:
         net_signal = "BULLISH"
-    elif bearish_weight >= 1.25 * bullish_weight and bearish_weight >= 0.4:
+    elif bearish_weight >= 1.25 * bullish_weight and bearish_weight >= 0.35:
         net_signal = "BEARISH"
-    elif abs(bullish_weight - bearish_weight) < 0.2 and (bullish_weight + bearish_weight) > 0.4:
+    elif spread < 0.2 and total_dir_weight > 0.35:
         net_signal = "MIXED"
     else:
         net_signal = "NEUTRAL"
 
     # Determine net confidence
-    total_effective = bullish_weight + bearish_weight + mixed_weight
-    spread = abs(bullish_weight - bearish_weight)
-    if distinct_clusters_count >= 5 and spread >= 0.8:
+    if distinct_clusters_count >= 5 and spread >= 0.6 and net_signal in ("BULLISH", "BEARISH"):
         net_confidence = "HIGH"
-    elif distinct_clusters_count >= 3 and spread >= 0.4:
+    elif distinct_clusters_count >= 3 and spread >= 0.3:
         net_confidence = "MEDIUM"
     else:
         net_confidence = "LOW"

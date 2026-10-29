@@ -30,6 +30,11 @@ BEARISH_FED_PATTERNS = [
     r"\brate hikes?\b",
     r"\bhigher for longer\b",
     r"\brates? hold with limited guidance\b",
+    r"\bfed (?:holds?|keeps?)(?: (?:interest )?rates?)?(?: (?:steady|unchanged))?\b",
+    r"\bfed (?:stays? put|tightening|hike fears?)\b",
+    r"\brate hold\b",
+    r"\binterest rates? unchanged\b",
+    r"\bvotes? (?:10-2|\d+-\d+) in favor of rate hold\b",
     r"\byields? (?:surge|climb|spike|rise|jump)\b",
     r"\bbond yields? tick higher\b",
     r"\bhotter than expected cpi\b",
@@ -44,6 +49,22 @@ BULLISH_FED_PATTERNS = [
     r"\beasing\b",
     r"\byields? (?:tumble|fall|drop|slide|plunge)\b",
     r"\bcuts? expected\b",
+    r"\bfed rate cut expectations?\b",
+]
+
+NEUTRAL_OR_MIXED_FED_PATTERNS = [
+    r"\bfed (?:rate )?decision\b",
+    r"\bfed meeting\b",
+    r"\bfed signals?\b",
+    r"\bfed day\b",
+    r"\bfed outlook\b",
+    r"\bahead of fed\b",
+    r"\blook to fed\b",
+    r"\bbrace for fed\b",
+    r"\bfed loom(?:ed|s)\b",
+    r"\bfed credibility\b",
+    r"\bbreathing room from fed\b",
+    r"\bbank of canada raises\b",
 ]
 
 BEARISH_DOLLAR_PATTERNS = [
@@ -62,40 +83,64 @@ BULLISH_DOLLAR_PATTERNS = [
 ]
 
 BULLISH_GEOPOLITICS_PATTERNS = [
-    r"\bwar costs?\b",
+    r"\b(?:iran|ukraine|russia|middle east|gaza|israel|red sea) (?:war|conflict|tensions?|strikes?)\b",
+    r"\bwar (?:costs?|fears?|and falling revenues?)\b",
     r"\bmilitary conflict\b",
     r"\bconflict escalates?\b",
     r"\bgeopolitical (?:tensions?|risks?|crisis)\b",
     r"\bairstrikes?\b",
-    r"\bsanctions? (?:tighten|hit|widen)\b",
+    r"\bsanctions? (?:tighten|hit|widen|drain)\b",
     r"\bsafe-?haven (?:demand|buying|flows?|appeal)\b",
     r"\bmiddle east conflict\b",
 ]
 
+INFLATION_MACRO_PATTERNS = [
+    r"\boil (?:rall(?:y|ies)|jumps?|surges?|spikes?|above \$?100|rises?)\b",
+    r"\bcrude\b",
+    r"\boil-?fueled inflation\b",
+    r"\binflation (?:fears?|concerns?|data|spikes?|heats? up)\b",
+    r"\bcpi\b",
+    r"\bpce\b",
+    r"\bstagflation\b",
+]
+
 BULLISH_PHYSICAL_PATTERNS = [
+    r"\bdiwali\b",
+    r"\bdhanteras\b",
+    r"\bkarwa chauth\b",
+    r"\bfestival (?:demand|buying|season)\b",
     r"\bgold demand (?:jumps?|surges?|rebounds?|spikes?)\b",
     r"\bbargain (?:hunting|buyers?|buying)\b",
     r"\bcentral banks? (?:accumulation|buying|purchases?)\b",
     r"\brbi (?:gold|reserves?)\b",
     r"\bpboc (?:gold|reserves?)\b",
-    r"\bfestival (?:demand|buying|season)\b",
-    r"\bdhanteras\b",
     r"\bjewelers? (?:stock up|buying)\b",
+    r"\bbon targets\b",
+]
+
+PHYSICAL_OR_RETAIL_PATTERNS = [
+    r"\bgold rate today\b",
+    r"\bprices in (?:delhi|mumbai|kolkata|chennai|hyderabad|pune|west bengal|ahmedabad|kerala)\b",
+    r"\bjeweller(?:y|s)?\b",
+    r"\bcentral banks? (?:accumulation|buying|purchases?|selling|reserves?)\b",
+    r"\b(?:rbi|pboc|kremlin|sovereign) (?:gold|reserves?)\b",
+    r"\breserves? (?:hit lowest|lowest level|drain)\b",
+    r"\bnon-oil exports\b",
 ]
 
 BEARISH_MOMENTUM_PATTERNS = [
-    r"\bgold (?:falls?|drops?|slides?|tumbles?|declines?|slips?|edges? lower)\b",
-    r"\bgold prices? (?:fall|drop|slide|tumble|decline|retreat)\b",
-    r"\bprecious metals? retreat\b",
-    r"\bsell-?off in gold\b",
-    r"\bgold under pressure\b",
+    r"\btechnical (?:sell-?off|breakdown|liquidation)\b",
+    r"\bflash crash\b",
+    r"\bstop-?loss triggered\b",
+    r"\bprecious metals? retreat on technical\b",
 ]
 
 BULLISH_MOMENTUM_PATTERNS = [
-    r"\bgold (?:rallies|surges?|jumps?|climbs?|rebounds?|soars?)\b",
-    r"\bgold prices? (?:rise|surge|jump|climb|rebound|soar)\b",
-    r"\bbullion (?:rallies|extends gains?|rises)\b",
+    r"\btechnical (?:analysis|breakout|surge)\b",
+    r"\bcharts? (?:point|signal|indicate)\b",
+    r"\bshort squeeze\b",
     r"\bgold hits record\b",
+    r"\bbreak \$?\d+ to rally\b",
 ]
 
 
@@ -155,12 +200,17 @@ def evaluate_gold_impact(
         driver = GoldDriver.US_FED_RATES
         direction = "BEARISH"
         confidence = "HIGH"
-        rationale = "Hawkish Fed rate expectations or rising Treasury yields increase the opportunity cost of holding non-yielding bullion."
+        rationale = "Hawkish Fed rate expectations, rate holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion."
     elif any(re.search(p, text) for p in BULLISH_FED_PATTERNS):
         driver = GoldDriver.US_FED_RATES
         direction = "BULLISH"
         confidence = "HIGH"
         rationale = "Expectations of Fed rate cuts or pauses diminish real yield hurdles, supporting capital allocation to precious metals."
+    elif any(re.search(p, text) for p in NEUTRAL_OR_MIXED_FED_PATTERNS):
+        driver = GoldDriver.US_FED_RATES
+        direction = "MIXED"
+        confidence = "MEDIUM"
+        rationale = "Federal Reserve interest rate decisions and monetary policy outlook dominate bullion positioning."
 
     # 2. US Dollar & Currency
     elif any(re.search(p, text) for p in BEARISH_DOLLAR_PATTERNS):
@@ -179,43 +229,54 @@ def evaluate_gold_impact(
         driver = GoldDriver.GEOPOLITICS_SAFE_HAVEN
         direction = "BULLISH"
         confidence = "HIGH"
-        rationale = "Heightened geopolitical friction or war risk accelerates safe-haven reserve and ETF accumulation."
+        rationale = "Heightened geopolitical friction, sanctions, or war risk accelerates safe-haven reserve and ETF accumulation."
 
-    # 4. Physical & Central Bank Demand
+    # 4. Inflation & Energy Shocks
+    elif any(re.search(p, text) for p in INFLATION_MACRO_PATTERNS):
+        driver = GoldDriver.INFLATION_MACRO
+        direction = "BEARISH" if ("oil rally" in text or "oil rises" in text or "oil jumps" in text) else "MIXED"
+        confidence = "MEDIUM"
+        rationale = "Surging crude oil and energy inflation stoke persistent yields and delay rate cuts, or prompt stagflation hedging."
+
+    # 5. Physical, Retail & Central Bank Demand
     elif any(re.search(p, text) for p in BULLISH_PHYSICAL_PATTERNS):
         driver = GoldDriver.PHYSICAL_AND_CENTRAL_BANK
         direction = "BULLISH"
         confidence = "HIGH"
-        rationale = "Sovereign reserve accumulation or physical consumer bargain buying provides a structural physical price floor."
+        rationale = "Sovereign reserve accumulation or festive consumer bargain buying (Diwali, Dhanteras) provides a structural physical price floor."
+    elif any(re.search(p, text) for p in PHYSICAL_OR_RETAIL_PATTERNS):
+        driver = GoldDriver.PHYSICAL_AND_CENTRAL_BANK
+        direction = "MIXED"
+        confidence = "MEDIUM"
+        rationale = "Physical bullion demand, domestic retail quotes, or central bank reserve management active in regional trading."
 
-    # 5. Price Momentum & Technical Action
+    # 6. Price Momentum & Technical Action
     elif any(re.search(p, text) for p in BULLISH_MOMENTUM_PATTERNS):
         driver = GoldDriver.MARKET_MOMENTUM
         direction = "BULLISH"
         confidence = "MEDIUM"
-        rationale = "Short-term technical breakout or upward price momentum attracts trend-following futures buyers."
+        rationale = "Short-term technical breakout or record price surge attracts trend-following futures buyers."
     elif any(re.search(p, text) for p in BEARISH_MOMENTUM_PATTERNS):
         driver = GoldDriver.MARKET_MOMENTUM
         direction = "BEARISH"
         confidence = "MEDIUM"
         rationale = "Downward price pressure or technical liquidation indicates active intraday profit-taking."
 
-    # Contextual resolution using FinBERT as weak prior if neutral/unmatched
+    # 7. Unmatched General Macroeconomic Commentary
     if direction == "UNCERTAIN":
-        if "gold" in text or "bullion" in text or "xauusd" in text:
-            driver = GoldDriver.MARKET_MOMENTUM
-            if finbert_label.upper() == "POSITIVE" and finbert_score > 0.4:
-                direction = "BULLISH"
-                confidence = "LOW"
-                rationale = "Positive market commentary on bullion, though specific macro transmission channel is broad."
-            elif finbert_label.upper() == "NEGATIVE" and finbert_score < -0.4:
-                direction = "BEARISH"
-                confidence = "LOW"
-                rationale = "Negative price commentary on bullion, reflecting short-term caution."
-            else:
-                direction = "MIXED"
-                confidence = "LOW"
-                rationale = "Bullion mentioned with balanced or offsetting drivers; market direction is neutral or consolidating."
+        driver = GoldDriver.OTHER_MACRO
+        if finbert_label.upper() == "POSITIVE" and finbert_score > 0.4:
+            direction = "BULLISH"
+            confidence = "LOW"
+            rationale = "Positive general macroeconomic commentary; specific commodity transmission is broad."
+        elif finbert_label.upper() == "NEGATIVE" and finbert_score < -0.4:
+            direction = "BEARISH"
+            confidence = "LOW"
+            rationale = "Cautious general macroeconomic commentary; specific commodity transmission is broad."
+        else:
+            direction = "MIXED"
+            confidence = "LOW"
+            rationale = "General market and commodity commentary with balanced or neutral directional implications."
 
     cluster_key = extract_cluster_key(title)
 

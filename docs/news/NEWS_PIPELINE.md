@@ -51,7 +51,12 @@ flowchart TD
    - Title Normalization: Strips publisher suffixes (` - Reuters`, ` | Bloomberg`), punctuation, and repeated whitespaces.
    - Result: **0 duplicate URLs and 0 duplicate titles** across all corpus records.
 4. **Relevance Tagging**: Classifies whether the article is relevant to precious metals, gold, central banks, or monetary policy (currently 40.0% relevant, 60.0% noise).
-5. **Domain-Specific Bullion Direction Mapping**: Evaluates commodity-specific economic transmission channels (hawkish Fed / strong USD -> Bearish for gold; dovish pauses, safe-haven geopolitics, central bank buying -> Bullish for gold).
+5. **Domain-Specific Bullion Direction Mapping & Source Diversity Discounting**:
+   - Evaluates commodity-specific economic transmission channels: hawkish Fed / strong USD -> Bearish for gold; dovish pauses, safe-haven geopolitics, central bank buying -> Bullish for gold.
+   - **Driver Classification Taxonomy**: Robust multi-pattern classification categorizes headlines into `US_FED_RATES` (rate decisions, holds, tightening), `INFLATION_MACRO` (energy surges, oil spikes, CPI prints), `GEOPOLITICS_SAFE_HAVEN` (military escalation, trade wars, sanctions), `PHYSICAL_AND_CENTRAL_BANK` (sovereign reserves, Diwali/Dhanteras/Karwa Chauth retail demand), `US_DOLLAR_FX`, and `MARKET_MOMENTUM` (strictly genuine chart breakouts and technical rallies). Unmatched commentary defaults cleanly to `OTHER_MACRO`.
+   - **Source Diversity Discounting**: Repeated articles from the same media publisher receive diminishing marginal weight ($1/\sqrt{n}$) so multiple wire reprints or commentary from a single outlet cannot overwhelm independent consensus.
+   - **Category Saturation Discounting**: Multiple clusters within the identical macro channel receive diminishing returns ($1/\sqrt{k}$) to prevent a single news cycle flood from overwhelming multi-asset breadth.
+   - **Cross-Driver Conflict Detection**: When opposing drivers exhibit substantial evidence (both sides $\ge 0.35$ weight) with a narrow spread, net consensus honestly reports `MIXED` rather than forcing a directional bias.
 6. **Syndicated Wire Clustering**: Groups wire agency republications (e.g., identical stories published by Reuters, PTI, Yahoo Finance, and regional portals) into distinct semantic clusters, preventing sentiment score inflation.
 7. **Strict Separation of Live Operation vs. Historical Evaluation**:
    - **Live Signal**: Operates over a dynamic recency window ($[\text{now} - \text{window}, \text{now}]$, default 24h) and returns `INSUFFICIENT_FRESH_RELEVANT_NEWS` if fewer than 2 distinct clusters exist.

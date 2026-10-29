@@ -1,23 +1,52 @@
 name: Daily Pipeline Update & Evaluation
 
 on:
+  workflow_run:
+    workflows: ["News Data Collector"]
+    types:
+      - completed
+    branches:
+      - develop
   schedule:
     # 03:38 PM UTC = 09:08 PM IST
-    # Runs daily in the evening strictly after both morning and evening KJPL windows,
-    # hourly market rates, and the 15:00 UTC (08:30 PM IST) news collection batch have finished.
+    # Scheduled fallback recovery path running in the evening after market close.
     - cron: '38 15 * * *'
   workflow_dispatch:
 
+concurrency:
+  group: pipeline-update-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
+  actions: read
 
 jobs:
   update-pipeline:
     runs-on: ubuntu-latest
+    # Execute if manually triggered, run via schedule, or if triggered by successful news collection
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync latest develop commits
+        run: |
+          git pull --rebase origin develop
+
+      - name: Verify upstream datasets ready
+        run: |
+          echo "[PIPELINE WORKFLOW] Verifying required upstream datasets exist..."
+          test -s data/kjpl/kjpl_rates.csv || (echo "ERROR: Missing or empty data/kjpl/kjpl_rates.csv" && exit 1)
+          test -s data/market/market_rates.csv || (echo "ERROR: Missing or empty data/market/market_rates.csv" && exit 1)
+          test -s data/news/news_articles.csv || (echo "ERROR: Missing or empty data/news/news_articles.csv" && exit 1)
+          echo "[PIPELINE WORKFLOW] All upstream data artifacts verified ready."
 
       - name: Set up Python
         uses: actions/setup-python@v5
