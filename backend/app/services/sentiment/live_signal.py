@@ -97,8 +97,9 @@ def get_live_news_intelligence(
         except Exception:
             raw_candidates = []
 
-    # Priority 2: Fallback to analyzed news or raw news (or for point-in-time historical evaluation)
-    if not raw_candidates and ANALYZED_NEWS_CSV.exists():
+    # Priority 2: Fallback to analyzed news or raw news ONLY if dedicated live dataset does not exist
+    # (or for point-in-time historical evaluation when target_live_path is omitted)
+    if not raw_candidates and not target_live_path.exists() and ANALYZED_NEWS_CSV.exists():
         try:
             with ANALYZED_NEWS_CSV.open("r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
@@ -122,7 +123,7 @@ def get_live_news_intelligence(
             raw_candidates = []
 
     # Fallback to raw news if analyzed news produced no fresh candidates
-    if not raw_candidates and NEWS_CSV.exists():
+    if not raw_candidates and not target_live_path.exists() and NEWS_CSV.exists():
         try:
             with NEWS_CSV.open("r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)

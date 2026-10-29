@@ -350,10 +350,13 @@ export default function GoldSenseDashboard() {
     setIsRefreshing(true);
     setRefreshNotice(null);
     try {
-      const res = await fetch("/api/v1/market/refresh", { credentials: "omit" });
+      let res = await fetch("/api/market/refresh", { method: "POST", credentials: "omit" });
+      if (!res.ok) {
+        res = await fetch("/api/v1/market/refresh", { method: "POST", credentials: "omit" });
+      }
       const data = await res.json();
-      if (res.status === 429) {
-        setRefreshNotice(data.detail?.message || "Rate limit cooldown active (60s). Retaining latest observations.");
+      if (data.refreshed === false) {
+        setRefreshNotice(data.message || "Rate limit cooldown active (60s). Retaining latest observations.");
       } else if (res.ok) {
         setOverview(data);
         setRefreshNotice("Market rates successfully updated.");
@@ -552,8 +555,20 @@ export default function GoldSenseDashboard() {
           <div className="flex items-center space-x-3">
             {overview && (
               <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-400">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>{overview.overall_freshness}</span>
+                <span className={`inline-block w-2 h-2 rounded-full ${
+                  overview.overall_freshness === "FRESH"
+                    ? "bg-emerald-500 animate-pulse"
+                    : overview.overall_freshness === "DELAYED"
+                    ? "bg-amber-400"
+                    : "bg-rose-500"
+                }`} />
+                <span className={
+                  overview.overall_freshness === "FRESH"
+                    ? "text-emerald-400 font-medium"
+                    : overview.overall_freshness === "DELAYED"
+                    ? "text-amber-400 font-medium"
+                    : "text-rose-400 font-medium"
+                }>{overview.overall_freshness}</span>
                 <span className="text-zinc-600">|</span>
                 <span>Ahmedabad Spot: <strong className="text-amber-400">₹{overview.kjpl?.gold_mjdta?.toLocaleString()}/g</strong></span>
               </div>

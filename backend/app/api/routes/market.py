@@ -28,7 +28,7 @@ def market_overview():
     return get_market_overview()
 
 
-@router.post("/refresh")
+@router.api_route("/refresh", methods=["GET", "POST"])
 def trigger_market_refresh():
     """
     Trigger an active market refresh if cooldown period (60s) has passed.

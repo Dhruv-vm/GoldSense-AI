@@ -68,8 +68,7 @@ def get_latest_news(
 
                     if len(articles) >= limit:
                         break
-            if articles:
-                return articles
+            return articles
         except Exception:
             articles = []
 
