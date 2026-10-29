@@ -183,7 +183,7 @@ cd backend
 source .venv/bin/activate
 pytest tests/ -v
 ```
-All **59 unit and integration tests** validate:
+All **66 unit and integration tests** validate:
 - Dynamic conversion math (Troy oz to grams, USD/INR conversion).
 - Domestic premium and Indian customs duty parity.
 - Portfolio fine weight calculations across 999.9, 995, 916, 750 purities.

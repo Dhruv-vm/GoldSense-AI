@@ -25,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Enhanced to institutional 8-tab terminal (Overview, Markets, My Bullion, Predictions, News Feed, Research & History, Alerts, Settings).
   - Next.js 16 (Turbopack) build verified with zero errors.
 - **Test Suite Expansion**:
-  - Expanded backend test suite from 59 to **65 passing pytest tests (100% pass rate)**.
+  - Expanded backend test suite from 59 to **66 passing pytest tests (100% pass rate)**.
 - **Unified Market Data Service**:
   - `DataService` in `backend/app/services/data_service.py` with CSV fallback, metric conversions (Troy oz to grams, USD/INR conversion), and domestic premium calculations.
   - Debounced manual rate refresh API (`/api/v1/market/refresh`) with a 60-second cooldown window and honest data freshness badges (`FRESH`, `DELAYED`, `STALE`).
