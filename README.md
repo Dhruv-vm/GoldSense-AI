@@ -27,7 +27,9 @@
 - *Explicit Non-Commercial Scope*: Focuses purely on personal wealth monitoring — zero commercial POS, invoicing, customer CRM, or merchant selling workflows.
 
 ### 3. Freshness-First Bullion News Intelligence & Macro Driver Attribution
-- **Automated Collector**: Continuous RSS and GDELT 2.0 ingestion from premium financial desks (Reuters, Bloomberg, CNBC, Financial Express, Economic Times).
+- **Automated Collector**: Continuous RSS and GDELT 2.0 ingestion with dual persistence:
+  - `data/news/live_news.csv`: Dedicated live production dataset containing strictly unexpired, fresh articles (< 72h retention, default 24h lookback). Stale and future-dated articles are pruned on each run.
+  - `data/news/news_articles.csv`: Permanent append-only research archive (2,860+ records) preserving historical data for training and backtesting.
 - **Domain Relevance Engine**: High-precision multi-driver taxonomy categorizing news across Fed monetary policy, US Dollar FX, safe-haven geopolitics, physical retail demand, central bank accumulation, and market momentum.
 - **Commodity Directional Impact Ranking**: Replaces generic financial sentiment with bullion-specific economic transmission logic (e.g., hawkish Fed / strong dollar -> Bearish for gold; rate cuts, safe-haven geopolitics, central bank buying -> Bullish for gold).
 - **Syndicated Wire Clustering**: Semantic stem clustering deduplicates wire reprints (Reuters/PTI syndications) to prevent repeated headlines from artificially inflating sentiment scores.
@@ -35,6 +37,7 @@
 - **Decoupled Macro Consensus & Transparent Endpoints**:
   - `GET /api/news/live-signal?window_hours=24`: Returns net directional consensus (`BULLISH`, `BEARISH`, `MIXED`, `NEUTRAL`), confidence level, driver breakdown, market vs. news alignment, and explicit `INSUFFICIENT_FRESH_RELEVANT_NEWS` guard if fewer than 2 distinct fresh clusters exist.
   - `GET /api/news/latest?window_hours=24&limit=30`: Enriched with bullion impact, macro driver category, confidence, and explanatory evidence rationale for each story.
+  - `GET /api/news/archive?limit=50&offset=0`: Historical research archive access.
 
 ### 4. Machine Learning Forecasting Engine
 - **Target**: Next-event KJPL Gold rate (`next_event_gold`) and anticipated price delta.
@@ -187,7 +190,7 @@ cd backend
 source .venv/bin/activate
 pytest tests/ -v
 ```
-All **80 unit and integration tests** validate:
+All **88 unit and integration tests** validate:
 - Dynamic conversion math (Troy oz to grams, USD/INR conversion).
 - Domestic premium and Indian customs duty parity.
 - Portfolio fine weight calculations across 999.9, 995, 916, 750 purities.

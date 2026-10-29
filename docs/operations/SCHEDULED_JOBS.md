@@ -5,9 +5,28 @@
 | Workflow | File Path | Schedule (UTC) | Schedule (IST) | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
 | **KJPL Rate Collector** | `.github/workflows/kjpl-collector.yml` | `38 0, 8 1, 38 1, 38 7, 8 8, 38 8 * * *` | ~10:15–11:30 AM & ~5:15–6:30 PM IST | Scrapes KJPL spot gold (`gold_mjdta`) and silver (`silver_mjdta`) rates into `data/kjpl/kjpl_rates.csv`. Pre-shifted for public runner backlog. |
-| **Market Data Collector** | `.github/workflows/market-collector.yml` | `0 * * * *` | Hourly (at minute 0) | Ingests `GC=F`, `SI=F`, `USDINR=X` intraday closes from Yahoo Finance into `data/market/market_rates.csv`. |
-| **News RSS Collector** | `.github/workflows/news-collector.yml` | `0 3,9,15,21 * * *` | 8:30 AM, 2:30 PM, 8:30 PM, 2:30 AM IST | Queries GDELT 2.0 with Google News RSS fallback across 11 query groups into `data/news/news_articles.csv`. |
-| **Daily Pipeline Update & Evaluation** | `.github/workflows/pipeline-update.yml` | `38 14 * * *` | 8:08 PM IST (Daily evening post-market) | Executes `update_pipeline.py`, cleans events, builds market features, scores news via FinBERT, rebuilds training matrix, and benchmarks walk-forward evaluation. |
+| **Market Data Collector** | `.github/workflows/market-collector.yml` | `0 * * * *` | Hourly (at minute 0) | Ingests `GC=F`, `SI=F`, `USDINR=X` intraday closes from Yahoo Finance into `data/market/market_rates.csv`. Configured in pure UTC without unsupported timezone attributes. |
+| **News Freshness Collector** | `.github/workflows/news-collector.yml` | `0 3,9,15,21 * * *` | 8:30 AM, 2:30 PM, 8:30 PM, 2:30 AM IST | Queries GDELT 2.0 with Google News RSS fallback across 11 macro query groups. Writes strictly fresh unexpired news (< 72h retention, 24h collection lookback) to `data/news/live_news.csv` and appends all unique articles permanently into historical research archive `data/news/news_articles.csv`. |
+| **Daily Pipeline Update & Evaluation** | `.github/workflows/pipeline-update.yml` | `38 15 * * *` | 9:08 PM IST (Daily evening post-market) | Executes `update_pipeline.py` strictly after evening news collection (15:00 UTC / 8:30 PM IST) and KJPL evening rates are finalized. Cleans events, builds market features, scores news via FinBERT, rebuilds training matrix, and benchmarks walk-forward evaluation. |
+
+---
+
+## 2. Order of Execution & Dependency Management
+
+```mermaid
+flowchart TD
+    A[KJPL Morning / Evening Rates Scraped<br/>data/kjpl/kjpl_rates.csv] --> D[Daily Pipeline Update & Evaluation<br/>Runs at 15:38 UTC / 09:08 PM IST]
+    B[Hourly Market Rates Ingested<br/>data/market/market_rates.csv] --> D
+    C[News Freshness Collector Ingested<br/>Runs at 15:00 UTC / 08:30 PM IST<br/>data/news/live_news.csv & news_articles.csv] --> D
+    D --> E[Processed Datasets & Baseline Evaluation<br/>backend/ml/data/processed/]
+    E --> F[Validation Gatekeeper<br/>scripts/validate_pipeline_outputs.py]
+```
+
+### Critical Schedule Alignment
+The evening news collector runs at **15:00 UTC (08:30 PM IST)**. To prevent race conditions and ensure the day's fresh news is fully committed to the repository before model feature extraction and pipeline updating begins, the Daily Pipeline Update workflow is scheduled at **15:38 UTC (09:08 PM IST)**.
+
+### GitHub Actions UTC Constraint
+GitHub Actions evaluates all `schedule.cron` triggers strictly in Coordinated Universal Time (UTC). Unsupported attributes such as `timezone: 'Asia/Kolkata'` under `on.schedule` have been eliminated across all workflow definitions to prevent runner syntax warnings. All schedules employ bounded git push retry loops (`MAX_RETRIES=4` with `git pull --rebase origin develop`) to gracefully resolve concurrent commits.
 
 ---
 

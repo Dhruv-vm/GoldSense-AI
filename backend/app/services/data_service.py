@@ -19,6 +19,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 KJPL_CSV = PROJECT_ROOT / "data/kjpl/kjpl_rates.csv"
 MARKET_CSV = PROJECT_ROOT / "data/market/market_rates.csv"
 NEWS_CSV = PROJECT_ROOT / "data/news/news_articles.csv"
+NEWS_ARCHIVE_CSV = PROJECT_ROOT / "data/news/news_articles.csv"
+LIVE_NEWS_CSV = PROJECT_ROOT / "data/news/live_news.csv"
 ANALYZED_NEWS_CSV = PROJECT_ROOT / "backend/ml/data/processed/analyzed_news.csv"
 
 # Global rate limit for active market refreshes (minimum 60s cooldown)

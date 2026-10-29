@@ -24,6 +24,7 @@ class GoldDriver:
 # Regex patterns for directional commodity inference
 BEARISH_FED_PATTERNS = [
     r"\bfed (?:favors?|eyes?|considers?|mulls?|weighs?) hikes?\b",
+    r"\bfed (?:hikes?|raises?)(?: interest)? rates?\b",
     r"\bfavor hikes?\b",
     r"\bhawkish\b",
     r"\brate hikes?\b",
@@ -35,9 +36,10 @@ BEARISH_FED_PATTERNS = [
 ]
 
 BULLISH_FED_PATTERNS = [
+    r"\bfed cuts?(?: interest)? rates?\b",
+    r"\bcuts?(?: interest)? rates?\b",
     r"\brate cuts?\b",
     r"\bdovish\b",
-    r"\bfed cuts losses\b",
     r"\bfed pauses?\b",
     r"\beasing\b",
     r"\byields? (?:tumble|fall|drop|slide|plunge)\b",

@@ -28,7 +28,8 @@ jobs:
 
       - name: Collect news data
         env:
-          NEWS_LOOKBACK_HOURS: '6'
+          NEWS_LOOKBACK_HOURS: '24'
+          NEWS_LIVE_RETENTION_HOURS: '72'
         run: |
           PYTHONPATH=backend python scripts/collect_news_csv.py
 
@@ -37,12 +38,25 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          # Stage both permanent historical research archive and fresh live dataset
           git add data/news/news_articles.csv
+          git add data/news/live_news.csv
 
           if git diff --cached --quiet; then
-            echo "No new news data to commit."
+            echo "[NEWS WORKFLOW] No new news data to commit."
           else
-            git commit -m "data: collect news articles"
-            git pull --rebase origin develop
-            git push origin develop
+            git commit -m "data: collect news articles and refresh live news dataset"
+
+            MAX_RETRIES=4
+            for attempt in $(seq 1 $MAX_RETRIES); do
+              echo "[NEWS WORKFLOW] Push attempt $attempt of $MAX_RETRIES..."
+              if git pull --rebase origin develop && git push origin develop; then
+                echo "[NEWS WORKFLOW] Successfully pushed news updates."
+                exit 0
+              fi
+              echo "[NEWS WORKFLOW] Push failed or encountered concurrent update. Retrying in 5 seconds..."
+              sleep 5
+            done
+            echo "[NEWS WORKFLOW] ERROR: Failed to push after $MAX_RETRIES attempts."
+            exit 1
           fi

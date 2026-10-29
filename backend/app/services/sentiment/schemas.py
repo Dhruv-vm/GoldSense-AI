@@ -43,6 +43,15 @@ class NewsArticle(BaseModel):
     source: str
     language: str | None = None
     description: str | None = None
+    ingested_at: datetime | None = None
+    is_gold_relevant: bool | None = None
+    primary_category: str | None = None
+    driver_category: str | None = None
+    directional_implication: str | None = None
+    confidence: str | None = None
+    evidence_rationale: str | None = None
+    cluster_key: str | None = None
+    syndicated_copies_count: int | None = 1
 
 
 class SentimentScore(BaseModel):

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from app.services.data_service import ANALYZED_NEWS_CSV, NEWS_CSV, get_market_overview
+from app.services.data_service import ANALYZED_NEWS_CSV, NEWS_CSV, LIVE_NEWS_CSV, get_market_overview
 from app.services.sentiment.gold_impact import (
     GoldDriver,
     evaluate_gold_impact,
@@ -45,6 +45,7 @@ def parse_utc_timestamp(ts_str: str) -> datetime | None:
 def get_live_news_intelligence(
     window_hours: int = 24,
     reference_time: datetime | None = None,
+    live_csv_path: Path | str | None = None,
 ) -> dict[str, Any]:
     """
     Computes real-time, freshness-prioritized bullion news intelligence.
@@ -64,15 +65,46 @@ def get_live_news_intelligence(
     cutoff_time = now - timedelta(hours=window_hours)
 
     raw_candidates: list[dict[str, Any]] = []
+    target_live_path = Path(live_csv_path) if live_csv_path else LIVE_NEWS_CSV
 
-    # Read analyzed news or raw news
-    if ANALYZED_NEWS_CSV.exists():
+    # Priority 1: Read dedicated live news dataset
+    if target_live_path.exists():
+        try:
+            with target_live_path.open("r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for r in reader:
+                    pub_dt = parse_utc_timestamp(r.get("published_at", ""))
+                    if not pub_dt or pub_dt < cutoff_time or pub_dt > now + timedelta(minutes=15):
+                        continue
+
+                    is_gold_rel = r.get("is_gold_relevant", "False").lower() in ("true", "1")
+                    raw_candidates.append({
+                        "title": r.get("title", ""),
+                        "url": r.get("url", ""),
+                        "source": r.get("source", ""),
+                        "published_at": pub_dt,
+                        "sentiment_label": r.get("sentiment_label", "neutral"),
+                        "sentiment_score": float(r.get("sentiment_score", 0.0) or 0.0),
+                        "is_gold_relevant": is_gold_rel,
+                        "primary_category": r.get("primary_category", "GOLD_DIRECT"),
+                        "driver_category": r.get("driver_category"),
+                        "directional_implication": r.get("directional_implication"),
+                        "confidence": r.get("confidence"),
+                        "evidence_rationale": r.get("evidence_rationale"),
+                        "cluster_key": r.get("cluster_key"),
+                        "syndicated_copies_count": int(r.get("syndicated_copies_count", 1) or 1),
+                    })
+        except Exception:
+            raw_candidates = []
+
+    # Priority 2: Fallback to analyzed news or raw news (or for point-in-time historical evaluation)
+    if not raw_candidates and ANALYZED_NEWS_CSV.exists():
         try:
             with ANALYZED_NEWS_CSV.open("r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 for r in reader:
                     pub_dt = parse_utc_timestamp(r.get("published_at", ""))
-                    if not pub_dt or pub_dt < cutoff_time or pub_dt > now + timedelta(minutes=10):
+                    if not pub_dt or pub_dt < cutoff_time or pub_dt > now + timedelta(minutes=15):
                         continue
 
                     is_gold_rel = r.get("is_gold_relevant", "False").lower() in ("true", "1")
@@ -96,7 +128,7 @@ def get_live_news_intelligence(
                 reader = csv.DictReader(f)
                 for r in reader:
                     pub_dt = parse_utc_timestamp(r.get("published_at", ""))
-                    if not pub_dt or pub_dt < cutoff_time or pub_dt > now + timedelta(minutes=10):
+                    if not pub_dt or pub_dt < cutoff_time or pub_dt > now + timedelta(minutes=15):
                         continue
 
                     rel = scorer.score_text(r.get("title", ""))
@@ -181,6 +213,7 @@ def get_live_news_intelligence(
     if distinct_clusters_count < 2:
         return {
             "status": "INSUFFICIENT_FRESH_RELEVANT_NEWS",
+            "is_sufficient": False,
             "window_hours": window_hours,
             "evaluated_at": now.isoformat(),
             "total_fresh_scanned": total_fresh_scanned,
@@ -277,6 +310,7 @@ def get_live_news_intelligence(
 
     return {
         "status": "ACTIVE",
+        "is_sufficient": True,
         "window_hours": window_hours,
         "evaluated_at": now.isoformat(),
         "total_fresh_scanned": total_fresh_scanned,

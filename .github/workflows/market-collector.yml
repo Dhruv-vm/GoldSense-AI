@@ -3,7 +3,6 @@ name: Market Data Collector
 on:
   schedule:
     - cron: '0 * * * *'
-      timezone: 'Asia/Kolkata'
   workflow_dispatch:
 
 permissions:
@@ -38,9 +37,20 @@ jobs:
           git add data/market/market_rates.csv
 
           if git diff --cached --quiet; then
-            echo "No new market data to commit."
+            echo "[MARKET WORKFLOW] No new market data to commit."
           else
             git commit -m "data: collect market rates"
-            git pull --rebase origin develop
-            git push origin develop
+
+            MAX_RETRIES=4
+            for attempt in $(seq 1 $MAX_RETRIES); do
+              echo "[MARKET WORKFLOW] Push attempt $attempt of $MAX_RETRIES..."
+              if git pull --rebase origin develop && git push origin develop; then
+                echo "[MARKET WORKFLOW] Successfully pushed market updates."
+                exit 0
+              fi
+              echo "[MARKET WORKFLOW] Push failed or encountered concurrent update. Retrying in 5 seconds..."
+              sleep 5
+            done
+            echo "[MARKET WORKFLOW] ERROR: Failed to push after $MAX_RETRIES attempts."
+            exit 1
           fi

@@ -2,10 +2,10 @@ name: Daily Pipeline Update & Evaluation
 
 on:
   schedule:
-    # 02:38 PM UTC = 08:08 PM IST
-    # Runs daily in the evening after both morning and evening KJPL windows,
-    # hourly market rates, and the 15:00 UTC (8:30 PM IST) news collection batch.
-    - cron: '38 14 * * *'
+    # 03:38 PM UTC = 09:08 PM IST
+    # Runs daily in the evening strictly after both morning and evening KJPL windows,
+    # hourly market rates, and the 15:00 UTC (08:30 PM IST) news collection batch have finished.
+    - cron: '38 15 * * *'
   workflow_dispatch:
 
 permissions:

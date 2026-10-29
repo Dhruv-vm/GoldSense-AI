@@ -5,6 +5,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [2.3.0-develop] - 2026-10-29
+
+### Added
+- **Freshness-First GitHub Actions News Collector**:
+  - Upgraded `scripts/collect_news_csv.py` and `backend/app/services/sentiment/news_client.py` with dual-target persistence architecture:
+    - `data/news/live_news.csv`: strictly unexpired, fresh articles within active recency window (< 72h max retention, default 24h collection lookback). Automatically prunes stale articles on every run, rejects future-dated ($> 15\text{m}$) and unparseable timestamps, and deduplicates syndicated wire stories into semantic clusters with `syndicated_copies_count`.
+    - `data/news/news_articles.csv`: permanent, append-only historical research archive preserving every unique collected article (2,860+ records) for zero-lookahead backtesting and training.
+  - Added GDELT rate-limit circuit breaker (`_gdelt_throttled_until` cooldown) with instant fallback to Google News RSS feeds.
+  - Added `GET /api/news/archive` endpoint for paginated access to the historical research archive while `GET /api/news/latest` serves the live fresh dataset.
+- **Collector Freshness Unit Test Suite**:
+  - `backend/tests/test_news_collector_freshness.py`: 8 comprehensive tests validating stale vs. fresh timestamp rejection, future timestamp rejection, invalid timestamp handling, timezone UTC normalization, syndicated headline clustering, live dataset isolation from research archive, low fresh corpus guard (`INSUFFICIENT_FRESH_RELEVANT_NEWS`), and workflow schedule ordering.
+  - Expanded test suite to **88 passing tests (100% pass rate)**.
+
+### Fixed
+- **Workflow Schedule Ordering & GitHub Actions Schema**:
+  - Fixed schedule ordering in `.github/workflows/pipeline-update.yml` from `38 14 * * *` (14:38 UTC = 08:08 PM IST) to `38 15 * * *` (15:38 UTC = 09:08 PM IST), ensuring the daily pipeline update runs strictly after the 15:00 UTC (08:30 PM IST) news collection batch has completed and committed.
+  - Removed unsupported `timezone: 'Asia/Kolkata'` field under `schedule.cron` in `.github/workflows/market-collector.yml` (GitHub Actions cron is evaluated strictly in UTC).
+  - Hardened `.github/workflows/news-collector.yml` and `.github/workflows/market-collector.yml` with bounded git push retries (`MAX_RETRIES=4` with `git pull --rebase origin develop`).
+
+---
+
 ## [2.2.0-develop] - 2026-10-29
 
 ### Added
