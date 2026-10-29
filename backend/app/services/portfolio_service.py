@@ -41,13 +41,13 @@ class PortfolioService:
             for h in holdings:
                 metal = h.metal_type.upper()
                 rate_per_gram = gold_rate if metal == "GOLD" else silver_rate
-                
+
                 # Reconciled benchmark valuation:
                 # Rate is quoted for 0.999 benchmark purity.
                 # Valuation = Gross Weight * Rate * (Purity / 0.999) * Quantity
                 benchmark_purity = 0.999
                 current_valuation = round(h.gross_weight_grams * (h.purity / benchmark_purity) * rate_per_gram * h.quantity, 2)
-                
+
                 gain_loss_inr = None
                 gain_loss_pct = None
                 if h.acquisition_cost_inr is not None and h.acquisition_cost_inr > 0:
@@ -162,7 +162,7 @@ class PortfolioService:
                 gross_grams = gw * 1000.0 if unit in ("kg", "kilogram") else gw
                 if gross_grams > 0:
                     holding.gross_weight_grams = gross_grams
-            
+
             # Recalculate fine weight
             holding.fine_weight_grams = round(holding.gross_weight_grams * holding.purity, 4)
 

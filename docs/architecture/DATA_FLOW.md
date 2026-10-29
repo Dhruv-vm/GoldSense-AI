@@ -17,12 +17,12 @@ sequenceDiagram
     Frontend->>API: GET /api/v1/market/overview
     API->>DataSvc: Get latest rates & compute domestic premium
     DataSvc-->>Frontend: Return Gold/Silver spot, global parity, premium %
-    
+
     User->>Frontend: View Portfolio
     Frontend->>API: GET /api/v1/portfolio (with X-User-ID)
     API->>DataSvc: Calculate holdings valuation using latest spot
     DataSvc-->>Frontend: Return fine weights, total value, unrealized PnL
-    
+
     User->>Frontend: View AI Prediction
     Frontend->>API: GET /api/v1/prediction/latest
     API->>ML: Evaluate model readiness & features

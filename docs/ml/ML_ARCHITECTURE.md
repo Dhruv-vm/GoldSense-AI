@@ -20,11 +20,11 @@ flowchart TD
     Market[data/market/market_rates.csv] --> Align
     News[ml/data/processed/analyzed_news.csv] --> Align
     Align --> Dataset[ml/data/processed/gold_training_dataset.csv]
-    
+
     Dataset --> Gatekeeper{Sample Count Check}
     Gatekeeper -- "N < 50" --> ExpMode["EXPERIMENTAL_DATA_COLLECTION Status (Transparent UI Warning)"]
     Gatekeeper -- "N >= 50" --> Train[train_model.py]
-    
+
     Train --> Eval[Time-Series Split Walk-Forward Validation]
     Eval --> Artifact[ml/models/gold_price_model.joblib]
     Artifact --> PredAPI[Prediction API /api/v1/prediction/latest]

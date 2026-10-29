@@ -63,7 +63,7 @@ def run_walk_forward_evaluation() -> dict:
 
     # Directional Accuracy of Naive (direction of actual change vs zero)
     actual_deltas = actuals - clean_df["gold_mjdta"].values
-    
+
     # 3-event Simple Moving Average Baseline
     sma_preds = []
     for i in range(len(actuals)):

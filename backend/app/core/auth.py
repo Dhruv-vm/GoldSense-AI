@@ -20,14 +20,14 @@ def get_current_user(
 ) -> str:
     """
     Server-side authorization dependency.
-    
+
     In authenticated mode (AUTH_ENABLED=true):
       - Validates Bearer token or X-API-Key against server authorization secret using constant-time comparison.
       - Fails closed if GOLDSENSE_API_KEY is unset or empty.
       - Never allows unauthenticated caller-supplied user IDs to bypass security.
       - Binds the authenticated session to the verified tenant/owner.
       - Rejects attempts to spoof or switch to another user_id with HTTP 403 Forbidden.
-    
+
     In local single-user mode (AUTH_ENABLED=false):
       - Binds strictly to the local owner (default 'owner').
       - Allows explicit test harness user overrides only when test isolation is active.
