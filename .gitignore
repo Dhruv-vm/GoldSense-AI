@@ -14,8 +14,20 @@ env/
 !.env.example
 
 # ML generated data
-ml/data/processed/
-backend/ml/data/processed/
+ml/data/processed/*
+!ml/data/processed/kjpl_events.csv
+!ml/data/processed/market_features.csv
+!ml/data/processed/analyzed_news.csv
+!ml/data/processed/gold_training_dataset.csv
+!ml/data/processed/evaluation_report.json
+!ml/data/processed/news_signal_experiment.json
+backend/ml/data/processed/*
+!backend/ml/data/processed/kjpl_events.csv
+!backend/ml/data/processed/market_features.csv
+!backend/ml/data/processed/analyzed_news.csv
+!backend/ml/data/processed/gold_training_dataset.csv
+!backend/ml/data/processed/evaluation_report.json
+!backend/ml/data/processed/news_signal_experiment.json
 
 # OS files
 .DS_Store

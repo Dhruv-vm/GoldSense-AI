@@ -2,28 +2,35 @@
 
 ## 1. Automated GitHub Actions Matrix
 
-| Workflow | Path | Schedule | Purpose |
-| :--- | :--- | :--- | :--- |
-| **KJPL Rate Collector** | `.github/workflows/kjpl_collector.yml` | Twice daily (Morning & Evening IST) | Scrapes KJPL spot gold and silver rates. |
-| **Market Data Collector**| `.github/workflows/market_collector.yml`| Every 4.5 hours | Ingests `GC=F`, `SI=F`, `USDINR=X` from Yahoo Finance. |
-| **News RSS Collector** | `.github/workflows/news_collector.yml` | Every 6 hours | Fetches financial news feeds and tags bullion keywords. |
+| Workflow | File Path | Schedule (UTC) | Schedule (IST) | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **KJPL Rate Collector** | `.github/workflows/kjpl-collector.yml` | `38 0, 8 1, 38 1, 38 7, 8 8, 38 8 * * *` | ~10:15–11:30 AM & ~5:15–6:30 PM IST | Scrapes KJPL spot gold (`gold_mjdta`) and silver (`silver_mjdta`) rates into `data/kjpl/kjpl_rates.csv`. Pre-shifted for public runner backlog. |
+| **Market Data Collector** | `.github/workflows/market-collector.yml` | `0 * * * *` | Hourly (at minute 0) | Ingests `GC=F`, `SI=F`, `USDINR=X` intraday closes from Yahoo Finance into `data/market/market_rates.csv`. |
+| **News RSS Collector** | `.github/workflows/news-collector.yml` | `0 3,9,15,21 * * *` | 8:30 AM, 2:30 PM, 8:30 PM, 2:30 AM IST | Queries GDELT 2.0 with Google News RSS fallback across 11 query groups into `data/news/news_articles.csv`. |
+| **Daily Pipeline Update & Evaluation** | `.github/workflows/pipeline-update.yml` | `38 14 * * *` | 8:08 PM IST (Daily evening post-market) | Executes `update_pipeline.py`, cleans events, builds market features, scores news via FinBERT, rebuilds training matrix, and benchmarks walk-forward evaluation. |
 
 ---
 
-## 2. Maintenance & Sync Scripts
+## 2. Maintenance & Pipeline Execution
 
-### News Sentiment Cache Sync
+### Automated End-to-End Pipeline
+To run the full five-stage data cleaning, feature alignment, news synchronization, training dataset build, and walk-forward evaluation locally:
 ```bash
 cd backend
 source .venv/bin/activate
-python ml/training/sync_news_analysis.py
+python ml/training/update_pipeline.py
 ```
-Processes unprocessed articles through FinBERT and updates `analyzed_news.csv`.
 
-### Training Matrix Rebuild
+### Pipeline Output Validation
+To assert integrity across all five generated artifacts:
 ```bash
 cd backend
 source .venv/bin/activate
-python ml/features/build_training_dataset.py
+python ../scripts/validate_pipeline_outputs.py
 ```
-Re-aligns raw rates, market metrics, and news sentiment into `gold_training_dataset.csv`.
+Validates:
+1. `backend/ml/data/processed/kjpl_events.csv` (Monotonic timestamps, expected columns, zero-lookahead pending event).
+2. `backend/ml/data/processed/market_features.csv` (Chronological ordering, return metrics, staleness flags).
+3. `backend/ml/data/processed/analyzed_news.csv` (FinBERT probabilities, scores bounded in `[-1.0, 1.0]`, gold relevance taxonomy).
+4. `backend/ml/data/processed/gold_training_dataset.csv` (Strict alignment: `len(training_rows) == len(kjpl_events) - 1`, `market_observed_at <= event_time`).
+5. `backend/ml/data/processed/evaluation_report.json` (Walk-forward baseline metrics and data readiness threshold).

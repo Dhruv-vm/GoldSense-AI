@@ -183,13 +183,14 @@ cd backend
 source .venv/bin/activate
 pytest tests/ -v
 ```
-All **66 unit and integration tests** validate:
+All **69 unit and integration tests** validate:
 - Dynamic conversion math (Troy oz to grams, USD/INR conversion).
 - Domestic premium and Indian customs duty parity.
 - Portfolio fine weight calculations across 999.9, 995, 916, 750 purities.
 - Multi-user portfolio isolation and CRUD constraints.
 - Prediction service graceful handling of experimental sample counts (<50).
 - Zero-lookahead feature alignment invariants.
+- Pipeline output validation and evaluation artifact integrity.
 - API endpoints for rate overview, debounced refresh, alerts, and news feeds.
 
 ---
@@ -203,6 +204,7 @@ Detailed engineering guides and architectural specifications are organized in th
 - [Rate Units & Conversion Math](docs/data/RATE_UNITS_AND_CONVERSIONS.md)
 - [Personal Bullion Portfolio Model](docs/portfolio/PORTFOLIO_DATA_MODEL.md)
 - [FinBERT News Sentiment Pipeline](docs/news/SENTIMENT_ANALYSIS.md)
+- [News Signal Research Report](docs/ml/NEWS_PREDICTIVE_SIGNAL_RESEARCH.md)
 - [Machine Learning Zero-Leakage Engine](docs/ml/LEAKAGE_PREVENTION.md)
 - [Model Limitations & Data Thresholds](docs/ml/MODEL_LIMITATIONS.md)
 

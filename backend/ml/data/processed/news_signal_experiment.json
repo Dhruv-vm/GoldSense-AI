@@ -1,0 +1,751 @@
+{
+  "title": "GoldSense AI \u2014 News Predictive Signal Research Experiment",
+  "timestamp": "2026-10-29T10:31:23.814020+00:00",
+  "dataset_metadata": {
+    "total_kjpl_events": 36,
+    "min_training_window": 15,
+    "walk_forward_folds": 21,
+    "test_period_start": "2026-10-05 04:06:00+00:00",
+    "test_period_end": "2026-10-28 04:08:00+00:00",
+    "target_variable": "next_event_gold",
+    "zero_lookahead_verified": true
+  },
+  "comparative_benchmarks": {
+    "Naive Persistence Baseline": {
+      "mae_inr_per_g": 61.9,
+      "rmse_inr_per_g": 81.23,
+      "error_std_inr_per_g": 52.59,
+      "max_error_inr_per_g": 175.0,
+      "directional_accuracy_pct": 14.3,
+      "brier_score": 0.25
+    },
+    "Market-Only Features": {
+      "mae_inr_per_g": 63.96,
+      "rmse_inr_per_g": 77.97,
+      "error_std_inr_per_g": 44.59,
+      "max_error_inr_per_g": 172.31,
+      "directional_accuracy_pct": 52.4,
+      "brier_score": 0.2358
+    },
+    "News-Only Features": {
+      "mae_inr_per_g": 69.26,
+      "rmse_inr_per_g": 81.93,
+      "error_std_inr_per_g": 43.77,
+      "max_error_inr_per_g": 164.87,
+      "directional_accuracy_pct": 33.3,
+      "brier_score": 0.2644
+    },
+    "Market + Generic News": {
+      "mae_inr_per_g": 63.44,
+      "rmse_inr_per_g": 79.22,
+      "error_std_inr_per_g": 47.43,
+      "max_error_inr_per_g": 169.89,
+      "directional_accuracy_pct": 47.6,
+      "brier_score": 0.2382
+    },
+    "Market + Filtered News": {
+      "mae_inr_per_g": 65.59,
+      "rmse_inr_per_g": 84.4,
+      "error_std_inr_per_g": 53.12,
+      "max_error_inr_per_g": 175.85,
+      "directional_accuracy_pct": 47.6,
+      "brier_score": 0.2672
+    }
+  },
+  "conclusion": "Promising but inconclusive: news features do not demonstrate statistically significant incremental predictive power over market features on the current 34-sample dataset. Market features provide superior directional accuracy (52.4% vs 33.3% news-only), and adding news slightly increases variance.",
+  "fold_level_audit": [
+    {
+      "fold": 1,
+      "event_time": "2026-10-05 04:06:00+00:00",
+      "current_price": 13675.0,
+      "actual_next_price": 13660.0,
+      "actual_delta": -15.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13675.0,
+          "error": 15.0
+        },
+        "Market-Only Features": {
+          "pred_delta": -46.95,
+          "pred_price": 13628.05,
+          "error": 31.95
+        },
+        "News-Only Features": {
+          "pred_delta": -34.68,
+          "pred_price": 13640.32,
+          "error": 19.68
+        },
+        "Market + Generic News": {
+          "pred_delta": -56.87,
+          "pred_price": 13618.13,
+          "error": 41.87
+        },
+        "Market + Filtered News": {
+          "pred_delta": -39.44,
+          "pred_price": 13635.56,
+          "error": 24.44
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "event_time": "2026-10-06 04:26:00+00:00",
+      "current_price": 13660.0,
+      "actual_next_price": 13710.0,
+      "actual_delta": 50.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13660.0,
+          "error": 50.0
+        },
+        "Market-Only Features": {
+          "pred_delta": 2.03,
+          "pred_price": 13662.03,
+          "error": 47.97
+        },
+        "News-Only Features": {
+          "pred_delta": -27.04,
+          "pred_price": 13632.96,
+          "error": 77.04
+        },
+        "Market + Generic News": {
+          "pred_delta": 14.69,
+          "pred_price": 13674.69,
+          "error": 35.31
+        },
+        "Market + Filtered News": {
+          "pred_delta": 44.79,
+          "pred_price": 13704.79,
+          "error": 5.21
+        }
+      }
+    },
+    {
+      "fold": 3,
+      "event_time": "2026-10-07 04:12:00+00:00",
+      "current_price": 13710.0,
+      "actual_next_price": 13710.0,
+      "actual_delta": 0.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13710.0,
+          "error": 0.0
+        },
+        "Market-Only Features": {
+          "pred_delta": -0.17,
+          "pred_price": 13709.83,
+          "error": 0.17
+        },
+        "News-Only Features": {
+          "pred_delta": -11.34,
+          "pred_price": 13698.66,
+          "error": 11.34
+        },
+        "Market + Generic News": {
+          "pred_delta": 0.11,
+          "pred_price": 13710.11,
+          "error": 0.11
+        },
+        "Market + Filtered News": {
+          "pred_delta": 24.32,
+          "pred_price": 13734.32,
+          "error": 24.32
+        }
+      }
+    },
+    {
+      "fold": 4,
+      "event_time": "2026-10-08 04:02:00+00:00",
+      "current_price": 13710.0,
+      "actual_next_price": 13815.0,
+      "actual_delta": 105.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13710.0,
+          "error": 105.0
+        },
+        "Market-Only Features": {
+          "pred_delta": 32.3,
+          "pred_price": 13742.3,
+          "error": 72.7
+        },
+        "News-Only Features": {
+          "pred_delta": -12.87,
+          "pred_price": 13697.13,
+          "error": 117.87
+        },
+        "Market + Generic News": {
+          "pred_delta": 42.18,
+          "pred_price": 13752.18,
+          "error": 62.82
+        },
+        "Market + Filtered News": {
+          "pred_delta": 64.25,
+          "pred_price": 13774.25,
+          "error": 40.75
+        }
+      }
+    },
+    {
+      "fold": 5,
+      "event_time": "2026-10-09 04:05:00+00:00",
+      "current_price": 13815.0,
+      "actual_next_price": 13880.0,
+      "actual_delta": 65.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13815.0,
+          "error": 65.0
+        },
+        "Market-Only Features": {
+          "pred_delta": 46.66,
+          "pred_price": 13861.66,
+          "error": 18.34
+        },
+        "News-Only Features": {
+          "pred_delta": -5.25,
+          "pred_price": 13809.75,
+          "error": 70.25
+        },
+        "Market + Generic News": {
+          "pred_delta": 36.43,
+          "pred_price": 13851.43,
+          "error": 28.57
+        },
+        "Market + Filtered News": {
+          "pred_delta": 77.45,
+          "pred_price": 13892.45,
+          "error": 12.45
+        }
+      }
+    },
+    {
+      "fold": 6,
+      "event_time": "2026-10-10 03:48:00+00:00",
+      "current_price": 13880.0,
+      "actual_next_price": 13720.0,
+      "actual_delta": -160.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13880.0,
+          "error": 160.0
+        },
+        "Market-Only Features": {
+          "pred_delta": 12.31,
+          "pred_price": 13892.31,
+          "error": 172.31
+        },
+        "News-Only Features": {
+          "pred_delta": 4.87,
+          "pred_price": 13884.87,
+          "error": 164.87
+        },
+        "Market + Generic News": {
+          "pred_delta": 3.04,
+          "pred_price": 13883.04,
+          "error": 163.04
+        },
+        "Market + Filtered News": {
+          "pred_delta": 15.85,
+          "pred_price": 13895.85,
+          "error": 175.85
+        }
+      }
+    },
+    {
+      "fold": 7,
+      "event_time": "2026-10-12 11:51:00+00:00",
+      "current_price": 13720.0,
+      "actual_next_price": 13685.0,
+      "actual_delta": -35.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13720.0,
+          "error": 35.0
+        },
+        "Market-Only Features": {
+          "pred_delta": -70.95,
+          "pred_price": 13649.05,
+          "error": 35.95
+        },
+        "News-Only Features": {
+          "pred_delta": -6.06,
+          "pred_price": 13713.94,
+          "error": 28.94
+        },
+        "Market + Generic News": {
+          "pred_delta": -50.24,
+          "pred_price": 13669.76,
+          "error": 15.24
+        },
+        "Market + Filtered News": {
+          "pred_delta": -50.94,
+          "pred_price": 13669.06,
+          "error": 15.94
+        }
+      }
+    },
+    {
+      "fold": 8,
+      "event_time": "2026-10-13 04:14:00+00:00",
+      "current_price": 13685.0,
+      "actual_next_price": 13590.0,
+      "actual_delta": -95.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13685.0,
+          "error": 95.0
+        },
+        "Market-Only Features": {
+          "pred_delta": -3.21,
+          "pred_price": 13681.79,
+          "error": 91.79
+        },
+        "News-Only Features": {
+          "pred_delta": -12.92,
+          "pred_price": 13672.08,
+          "error": 82.08
+        },
+        "Market + Generic News": {
+          "pred_delta": 7.23,
+          "pred_price": 13692.23,
+          "error": 102.23
+        },
+        "Market + Filtered News": {
+          "pred_delta": 26.86,
+          "pred_price": 13711.86,
+          "error": 121.86
+        }
+      }
+    },
+    {
+      "fold": 9,
+      "event_time": "2026-10-14 04:08:00+00:00",
+      "current_price": 13590.0,
+      "actual_next_price": 13515.0,
+      "actual_delta": -75.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13590.0,
+          "error": 75.0
+        },
+        "Market-Only Features": {
+          "pred_delta": 0.56,
+          "pred_price": 13590.56,
+          "error": 75.56
+        },
+        "News-Only Features": {
+          "pred_delta": -23.63,
+          "pred_price": 13566.37,
+          "error": 51.37
+        },
+        "Market + Generic News": {
+          "pred_delta": 2.88,
+          "pred_price": 13592.88,
+          "error": 77.88
+        },
+        "Market + Filtered News": {
+          "pred_delta": 58.65,
+          "pred_price": 13648.65,
+          "error": 133.65
+        }
+      }
+    },
+    {
+      "fold": 10,
+      "event_time": "2026-10-15 04:09:00+00:00",
+      "current_price": 13515.0,
+      "actual_next_price": 13515.0,
+      "actual_delta": 0.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13515.0,
+          "error": 0.0
+        },
+        "Market-Only Features": {
+          "pred_delta": 38.75,
+          "pred_price": 13553.75,
+          "error": 38.75
+        },
+        "News-Only Features": {
+          "pred_delta": -20.41,
+          "pred_price": 13494.59,
+          "error": 20.41
+        },
+        "Market + Generic News": {
+          "pred_delta": 57.0,
+          "pred_price": 13572.0,
+          "error": 57.0
+        },
+        "Market + Filtered News": {
+          "pred_delta": 48.77,
+          "pred_price": 13563.77,
+          "error": 48.77
+        }
+      }
+    },
+    {
+      "fold": 11,
+      "event_time": "2026-10-16 03:56:00+00:00",
+      "current_price": 13515.0,
+      "actual_next_price": 13535.0,
+      "actual_delta": 20.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13515.0,
+          "error": 20.0
+        },
+        "Market-Only Features": {
+          "pred_delta": -84.23,
+          "pred_price": 13430.77,
+          "error": 104.23
+        },
+        "News-Only Features": {
+          "pred_delta": -3.01,
+          "pred_price": 13511.99,
+          "error": 23.01
+        },
+        "Market + Generic News": {
+          "pred_delta": -86.04,
+          "pred_price": 13428.96,
+          "error": 106.04
+        },
+        "Market + Filtered News": {
+          "pred_delta": -43.54,
+          "pred_price": 13471.46,
+          "error": 63.54
+        }
+      }
+    },
+    {
+      "fold": 12,
+      "event_time": "2026-10-17 04:02:00+00:00",
+      "current_price": 13535.0,
+      "actual_next_price": 13570.0,
+      "actual_delta": 35.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13535.0,
+          "error": 35.0
+        },
+        "Market-Only Features": {
+          "pred_delta": -21.93,
+          "pred_price": 13513.07,
+          "error": 56.93
+        },
+        "News-Only Features": {
+          "pred_delta": 7.82,
+          "pred_price": 13542.82,
+          "error": 27.18
+        },
+        "Market + Generic News": {
+          "pred_delta": -9.3,
+          "pred_price": 13525.7,
+          "error": 44.3
+        },
+        "Market + Filtered News": {
+          "pred_delta": -37.18,
+          "pred_price": 13497.82,
+          "error": 72.18
+        }
+      }
+    },
+    {
+      "fold": 13,
+      "event_time": "2026-10-19 04:11:00+00:00",
+      "current_price": 13570.0,
+      "actual_next_price": 13490.0,
+      "actual_delta": -80.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13570.0,
+          "error": 80.0
+        },
+        "Market-Only Features": {
+          "pred_delta": -14.28,
+          "pred_price": 13555.72,
+          "error": 65.72
+        },
+        "News-Only Features": {
+          "pred_delta": 8.33,
+          "pred_price": 13578.33,
+          "error": 88.33
+        },
+        "Market + Generic News": {
+          "pred_delta": -3.73,
+          "pred_price": 13566.27,
+          "error": 76.27
+        },
+        "Market + Filtered News": {
+          "pred_delta": -42.94,
+          "pred_price": 13527.06,
+          "error": 37.06
+        }
+      }
+    },
+    {
+      "fold": 14,
+      "event_time": "2026-10-20 04:40:00+00:00",
+      "current_price": 13490.0,
+      "actual_next_price": 13390.0,
+      "actual_delta": -100.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13490.0,
+          "error": 100.0
+        },
+        "Market-Only Features": {
+          "pred_delta": 3.75,
+          "pred_price": 13493.75,
+          "error": 103.75
+        },
+        "News-Only Features": {
+          "pred_delta": 2.56,
+          "pred_price": 13492.56,
+          "error": 102.56
+        },
+        "Market + Generic News": {
+          "pred_delta": 22.18,
+          "pred_price": 13512.18,
+          "error": 122.18
+        },
+        "Market + Filtered News": {
+          "pred_delta": 47.44,
+          "pred_price": 13537.44,
+          "error": 147.44
+        }
+      }
+    },
+    {
+      "fold": 15,
+      "event_time": "2026-10-21 03:59:00+00:00",
+      "current_price": 13390.0,
+      "actual_next_price": 13235.0,
+      "actual_delta": -155.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13390.0,
+          "error": 155.0
+        },
+        "Market-Only Features": {
+          "pred_delta": 2.89,
+          "pred_price": 13392.89,
+          "error": 157.89
+        },
+        "News-Only Features": {
+          "pred_delta": -13.34,
+          "pred_price": 13376.66,
+          "error": 141.66
+        },
+        "Market + Generic News": {
+          "pred_delta": 14.89,
+          "pred_price": 13404.89,
+          "error": 169.89
+        },
+        "Market + Filtered News": {
+          "pred_delta": 9.83,
+          "pred_price": 13399.83,
+          "error": 164.83
+        }
+      }
+    },
+    {
+      "fold": 16,
+      "event_time": "2026-10-22 04:14:00+00:00",
+      "current_price": 13235.0,
+      "actual_next_price": 13060.0,
+      "actual_delta": -175.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13235.0,
+          "error": 175.0
+        },
+        "Market-Only Features": {
+          "pred_delta": -77.58,
+          "pred_price": 13157.42,
+          "error": 97.42
+        },
+        "News-Only Features": {
+          "pred_delta": -37.19,
+          "pred_price": 13197.81,
+          "error": 137.81
+        },
+        "Market + Generic News": {
+          "pred_delta": -77.68,
+          "pred_price": 13157.32,
+          "error": 97.32
+        },
+        "Market + Filtered News": {
+          "pred_delta": -76.29,
+          "pred_price": 13158.71,
+          "error": 98.71
+        }
+      }
+    },
+    {
+      "fold": 17,
+      "event_time": "2026-10-23 04:06:00+00:00",
+      "current_price": 13060.0,
+      "actual_next_price": 13070.0,
+      "actual_delta": 10.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13060.0,
+          "error": 10.0
+        },
+        "Market-Only Features": {
+          "pred_delta": 16.73,
+          "pred_price": 13076.73,
+          "error": 6.73
+        },
+        "News-Only Features": {
+          "pred_delta": -53.37,
+          "pred_price": 13006.63,
+          "error": 63.37
+        },
+        "Market + Generic News": {
+          "pred_delta": 25.39,
+          "pred_price": 13085.39,
+          "error": 15.39
+        },
+        "Market + Filtered News": {
+          "pred_delta": 22.87,
+          "pred_price": 13082.87,
+          "error": 12.87
+        }
+      }
+    },
+    {
+      "fold": 18,
+      "event_time": "2026-10-24 03:54:00+00:00",
+      "current_price": 13070.0,
+      "actual_next_price": 13085.0,
+      "actual_delta": 15.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13070.0,
+          "error": 15.0
+        },
+        "Market-Only Features": {
+          "pred_delta": 3.06,
+          "pred_price": 13073.06,
+          "error": 11.94
+        },
+        "News-Only Features": {
+          "pred_delta": -37.56,
+          "pred_price": 13032.44,
+          "error": 52.56
+        },
+        "Market + Generic News": {
+          "pred_delta": 14.02,
+          "pred_price": 13084.02,
+          "error": 0.98
+        },
+        "Market + Filtered News": {
+          "pred_delta": 5.3,
+          "pred_price": 13075.3,
+          "error": 9.7
+        }
+      }
+    },
+    {
+      "fold": 19,
+      "event_time": "2026-10-26 04:06:00+00:00",
+      "current_price": 13085.0,
+      "actual_next_price": 13135.0,
+      "actual_delta": 50.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13085.0,
+          "error": 50.0
+        },
+        "Market-Only Features": {
+          "pred_delta": -18.39,
+          "pred_price": 13066.61,
+          "error": 68.39
+        },
+        "News-Only Features": {
+          "pred_delta": -25.93,
+          "pred_price": 13059.07,
+          "error": 75.93
+        },
+        "Market + Generic News": {
+          "pred_delta": -5.52,
+          "pred_price": 13079.48,
+          "error": 55.52
+        },
+        "Market + Filtered News": {
+          "pred_delta": -32.67,
+          "pred_price": 13052.33,
+          "error": 82.67
+        }
+      }
+    },
+    {
+      "fold": 20,
+      "event_time": "2026-10-27 04:12:00+00:00",
+      "current_price": 13135.0,
+      "actual_next_price": 13195.0,
+      "actual_delta": 60.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13135.0,
+          "error": 60.0
+        },
+        "Market-Only Features": {
+          "pred_delta": 13.23,
+          "pred_price": 13148.23,
+          "error": 46.77
+        },
+        "News-Only Features": {
+          "pred_delta": -19.61,
+          "pred_price": 13115.39,
+          "error": 79.61
+        },
+        "Market + Generic News": {
+          "pred_delta": 27.78,
+          "pred_price": 13162.78,
+          "error": 32.22
+        },
+        "Market + Filtered News": {
+          "pred_delta": 5.3,
+          "pred_price": 13140.3,
+          "error": 54.7
+        }
+      }
+    },
+    {
+      "fold": 21,
+      "event_time": "2026-10-28 04:08:00+00:00",
+      "current_price": 13195.0,
+      "actual_next_price": 13195.0,
+      "actual_delta": 0.0,
+      "predictions": {
+        "Naive Persistence Baseline": {
+          "pred_price": 13195.0,
+          "error": 0.0
+        },
+        "Market-Only Features": {
+          "pred_delta": -37.96,
+          "pred_price": 13157.04,
+          "error": 37.96
+        },
+        "News-Only Features": {
+          "pred_delta": -18.57,
+          "pred_price": 13176.43,
+          "error": 18.57
+        },
+        "Market + Generic News": {
+          "pred_delta": -28.16,
+          "pred_price": 13166.84,
+          "error": 28.16
+        },
+        "Market + Filtered News": {
+          "pred_delta": -30.33,
+          "pred_price": 13164.67,
+          "error": 30.33
+        }
+      }
+    }
+  ]
+}

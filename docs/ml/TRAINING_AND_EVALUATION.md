@@ -29,14 +29,23 @@ GoldSense AI employs **TimeSeriesSplit (Walk-Forward Validation)**:
 ## 3. Automated Walk-Forward Baseline Benchmarks
 GoldSense AI includes an automated walk-forward evaluation script (`backend/ml/training/walk_forward_evaluation.py`):
 - Benchmarks simple persistence ($\hat{y}_{t+1} = y_t$) and 3-event rolling SMA against the historical dataset.
-- Verified Baseline Metrics on current 32 usable rows:
-  - **Naive Persistence**: MAE = $\pm ₹68.28/\text{g}$, RMSE = $₹89.05/\text{g}$.
-  - **3-Event SMA**: MAE = $\pm ₹135.89/\text{g}$, RMSE = $₹175.07/\text{g}$.
-- Exports `evaluation_report.json` with status `INSUFFICIENT_DATA_FOR_SUPERVISED_TRAINING` until 50+ observations are logged.
+- Verified Baseline Metrics on current 34 usable rows:
+  - **Naive Persistence**: MAE = $\pm ₹66.03/\text{g}$, RMSE = $₹87.00/\text{g}$.
+  - **3-Event SMA**: MAE = $\pm ₹134.41/\text{g}$, RMSE = $₹171.98/\text{g}$.
+- Exports `evaluation_report.json` with status `INSUFFICIENT_DATA_FOR_SUPERVISED_TRAINING` until 50+ observations are logged (currently 34/50, 16 needed).
 
 ---
 
-## 4. End-to-End Pipeline Update Runner
+## 4. Multi-Feature Comparative Research Findings
+As documented in the [News Predictive Signal Research Report](NEWS_PREDICTIVE_SIGNAL_RESEARCH.md), a 21-fold out-of-sample walk-forward comparison shows:
+- **Market-Only Features**: MAE = ₹63.96/g, RMSE = ₹77.97/g, Directional Accuracy = **52.4%**.
+- **News-Only Features**: MAE = ₹69.26/g, RMSE = ₹81.93/g, Directional Accuracy = **33.3%**.
+- **Market + Filtered News**: MAE = ₹65.59/g, RMSE = ₹84.40/g, Directional Accuracy = **47.6%**.
+- **Conclusion**: News features currently demonstrate no incremental predictive value over baseline market variables on the initial sample size.
+
+---
+
+## 5. End-to-End Pipeline Update Runner
 Run the complete multi-stage pipeline with a single command:
 ```bash
 python backend/ml/training/update_pipeline.py

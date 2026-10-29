@@ -5,6 +5,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [2.1.0-develop] - 2026-10-29
+
+### Added
+- **News Predictive Signal Research Deliverable**:
+  - Comprehensive empirical audit in `docs/ml/NEWS_PREDICTIVE_SIGNAL_RESEARCH.md` investigating 2,815 articles across 21 out-of-sample walk-forward folds.
+  - Comparative benchmarks: Naive Persistence (MAE: ₹61.90/g), Market-Only (MAE: ₹63.96/g, Directional Acc: 52.4%), News-Only (MAE: ₹69.26/g, Directional Acc: 33.3%), and Market + News (MAE: ₹65.59/g, Directional Acc: 47.6%).
+  - Detailed domain analysis identifying the FinBERT commodity polarity mismatch (e.g. strong dollar evaluated as positive financial language but bearish for bullion).
+  - Machine-readable evaluation export in `backend/ml/data/processed/news_signal_experiment.json`.
+- **Daily Automated Pipeline & Evaluation Workflow**:
+  - Dedicated GitHub Actions workflow `.github/workflows/pipeline-update.yml` running daily at `38 14 * * *` UTC (8:08 PM IST) after morning and evening market publication windows.
+  - Executes `update_pipeline.py`, cleans events, builds market features, scores news via FinBERT, rebuilds training matrix, and benchmarks walk-forward baseline metrics.
+  - Bounded retry push strategy with rebase to prevent non-fast-forward failures against concurrent collector commits.
+- **Pipeline Output Integrity Validator**:
+  - Automated integrity check `scripts/validate_pipeline_outputs.py` asserting non-empty datasets, monotonic timestamps, expected feature columns, and zero-lookahead invariants across all 5 generated artifacts.
+  - Unit test suite `backend/tests/test_pipeline_validation.py` expanding test coverage to **69 passing tests (100% pass rate)**.
+
+### Fixed
+- **Market Data Collector Concurrency**:
+  - Added `git pull --rebase origin develop` and explicit `git push origin develop` to `.github/workflows/market-collector.yml`, eliminating push rejection when running in parallel with news ingestion.
+- **Dynamic Sample-Count Test Assertion**:
+  - Replaced hardcoded sample count in `tests/test_api_endpoints.py` with dynamic range assertion, allowing seamless accumulation of genuine daily events.
+
+---
+
 ## [2.0.0-develop] - 2026-10-27
 
 ### Added

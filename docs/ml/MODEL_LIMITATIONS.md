@@ -1,8 +1,9 @@
 # Model Limitations, Assumptions & Risk Disclaimers
 
 ## 1. Current Statistical Limitations
-- **Sample Size Constraint**: With 34 aligned historical trading events, classical machine learning models (Random Forest, Gradient Boosting) are prone to high variance and overfitting if over-parameterized.
-- **Intraday Collector Resolution**: Market rates are ingested at approximately 4.5-hour intervals via GitHub Actions runners, meaning high-frequency intraday momentum (15m, 1h) cannot be reliably resolved.
+- **Sample Size Constraint**: With 36 aligned historical trading events (34 complete training rows), classical machine learning models (Random Forest, Gradient Boosting) are prone to high variance and overfitting if over-parameterized.
+- **Enforced 50-Event Threshold**: Model training and live predictive inference remain strictly locked behind status `EXPERIMENTAL_DATA_COLLECTION` until at least 50 complete daily trading sessions have been observed.
+- **Absence of Standalone News Predictive Value**: Out-of-sample walk-forward testing (see [News Signal Research Report](NEWS_PREDICTIVE_SIGNAL_RESEARCH.md)) demonstrates that generic financial sentiment scores currently fail to add incremental predictive value over baseline market metrics, and actually degrade directional accuracy (from 52.4% down to 47.6%) due to feature noise on small samples.
 
 ---
 

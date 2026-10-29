@@ -1,0 +1,72 @@
+name: Daily Pipeline Update & Evaluation
+
+on:
+  schedule:
+    # 02:38 PM UTC = 08:08 PM IST
+    # Runs daily in the evening after both morning and evening KJPL windows,
+    # hourly market rates, and the 15:00 UTC (8:30 PM IST) news collection batch.
+    - cron: '38 14 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+          pip install transformers
+
+      - name: Run end-to-end pipeline update
+        run: |
+          PYTHONPATH=backend python backend/ml/training/update_pipeline.py
+
+      - name: Validate pipeline outputs
+        run: |
+          PYTHONPATH=backend python scripts/validate_pipeline_outputs.py
+
+      - name: Commit updated pipeline artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Stage only the intended generated artifacts
+          git add backend/ml/data/processed/kjpl_events.csv
+          git add backend/ml/data/processed/market_features.csv
+          git add backend/ml/data/processed/analyzed_news.csv
+          git add backend/ml/data/processed/gold_training_dataset.csv
+          git add backend/ml/data/processed/evaluation_report.json
+
+          if git diff --cached --quiet; then
+            echo "[PIPELINE WORKFLOW] No changes in pipeline outputs to commit."
+          else
+            git commit -m "data: update daily training pipeline and evaluation benchmarks"
+
+            # Safe push with bounded retries and rebase against concurrent collector commits
+            MAX_RETRIES=4
+            for attempt in $(seq 1 $MAX_RETRIES); do
+              echo "[PIPELINE WORKFLOW] Push attempt $attempt of $MAX_RETRIES..."
+              if git pull --rebase origin develop && git push origin develop; then
+                echo "[PIPELINE WORKFLOW] Successfully pushed updated pipeline artifacts."
+                exit 0
+              fi
+              echo "[PIPELINE WORKFLOW] Push failed or encountered concurrent update. Retrying in 5 seconds..."
+              sleep 5
+            done
+            echo "[PIPELINE WORKFLOW] ERROR: Failed to push after $MAX_RETRIES attempts."
+            exit 1
+          fi
