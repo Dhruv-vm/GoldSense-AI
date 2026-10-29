@@ -1,6 +1,6 @@
 {
   "status": "INSUFFICIENT_DATA_FOR_SUPERVISED_TRAINING",
-  "timestamp": "2026-10-29T20:07:52.150604+00:00",
+  "timestamp": "2026-10-29T20:32:33.783597+00:00",
   "dataset_metadata": {
     "total_events_in_dataset": 36,
     "usable_complete_rows": 34,
