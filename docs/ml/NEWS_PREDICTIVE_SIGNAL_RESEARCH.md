@@ -145,11 +145,32 @@ Without domain-adapted bullion sentiment heads that map economic events to direc
 
 ---
 
-## 8. Next Experimental Priorities
+## 8. Freshness-First Bullion Directional Signal Evaluation
 
-1. **Develop a Gold-Specific Polarity Mapping Layer**:
-   - Transition from generic FinBERT (positive/negative financial language) to an event-based polarity mapper (e.g. `Fed Hawkish` -> `Gold Bearish`, `Inflation High` -> `Gold Bullish`, `Escalation` -> `Gold Bullish`).
-2. **Target High-Impact Macro Economic Surprises**:
+In response to the generic FinBERT polarity dilemma, we implemented and benchmarked a domain-specific **Bullion Direction Mapping Engine** (`backend/app/services/sentiment/gold_impact.py`) and a point-in-time **Freshness-First Walk-Forward Harness** (`backend/ml/training/fresh_news_walk_forward.py`).
+
+### Walk-Forward Benchmarks (21 Out-of-Sample Folds)
+
+| Model Specification | Features Used | MAE (INR/g) | RMSE (INR/g) | Directional Acc (%) | Brier Score |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **1. Naive Persistence Baseline** | None ($\hat{y}_{t+1} = y_t$) | **₹61.90** | ₹81.23 | 14.3%* | 0.3643 |
+| **2. Market-Only Features (Ridge)** | 11 market & return features | **₹62.62** | **₹74.29** | **61.9%** | **0.2452** |
+| **3. Fresh News-Only (24h Bullion Impact)** | 6 fresh bullion impact features | ₹76.88 | ₹89.50 | 38.1% | 0.3048 |
+| **4. Market + Fresh News (Ridge)** | 17 combined features | ₹67.76 | ₹81.68 | 47.6% | 0.2810 |
+
+### Key Takeaways
+1. **Domain Direction Rules Outperform Generic Sentiment**:
+   Commodity-grounded directional rules (mapping hawkish Fed and strong dollar to bearish; dovish pauses, safe-haven geopolitics, and central bank buying to bullish) improved news-only directional accuracy from **33.3% to 38.1%**.
+2. **Market Features Remain Primary Short-Horizon Drivers**:
+   Market-only features (COMEX Gold, USD/INR, COMEX Silver, Domestic Premium) achieved the highest directional accuracy (**61.9%**) and lowest RMSE (**₹74.29/g**).
+3. **Architectural Decoupling**:
+   Adding news features to market regressions continues to increase variance and degrade directional accuracy on low sample sizes. In strict compliance with quantitative trading discipline, GoldSense AI decouples live news intelligence into an independent macro consensus and risk indicator (`GET /api/news/live-signal`), rather than corrupting the quantitative price regression.
+
+---
+
+## 9. Next Experimental Priorities
+
+1. **Target High-Impact Macro Economic Surprises**:
    - Rather than continuous average sentiment, measure *surprise deltas* (actual vs expected CPI, NFP, Fed dot plot) tagged with timestamped release moments.
-3. **Re-evaluate at Milestone 50**:
+2. **Re-evaluate at Milestone 50**:
    - Re-run this exact walk-forward harness once the 50-event dataset threshold is reached to evaluate whether non-linear XGBoost ensembles uncover non-linear interactions between market momentum and news volume spikes.

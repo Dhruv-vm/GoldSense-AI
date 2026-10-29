@@ -6,6 +6,7 @@ import pandas as pd
 import xgboost as xgb
 
 from app.services.data_service import get_market_overview, PROJECT_ROOT
+from app.services.sentiment.live_signal import get_live_news_intelligence
 
 MODEL_DIR = PROJECT_ROOT / "backend/ml/models"
 PRICE_MODEL_PATH = MODEL_DIR / "gold_price_xgb.json"
@@ -58,6 +59,7 @@ def get_prediction_status() -> dict:
     derived = overview.get("derived", {})
     market = overview.get("market", {})
     kjpl = overview.get("kjpl", {})
+    news_intel = get_live_news_intelligence(window_hours=24)
 
     # Load baseline benchmarks if available
     eval_report_path = PROJECT_ROOT / "backend/ml/data/processed/evaluation_report.json"
@@ -98,6 +100,7 @@ def get_prediction_status() -> dict:
                 "validation_methodology": "Walk-forward chronological holdout (strictly no-lookahead)",
                 "features_used": len(FEATURE_COLUMNS),
             },
+            "news_intelligence": news_intel,
         }
 
     # If models are present, load and execute
@@ -143,6 +146,7 @@ def get_prediction_status() -> dict:
             "forecast_horizon": "1 Trading Day",
             "model_version": "xgboost-v1",
             "predicted_at": datetime.now(timezone.utc).isoformat(),
+            "news_intelligence": news_intel,
         }
     except Exception as e:
         return {

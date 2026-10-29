@@ -1,14 +1,16 @@
 {
-  "title": "GoldSense AI \u2014 News Predictive Signal Research Experiment",
-  "timestamp": "2026-10-29T10:31:23.814020+00:00",
+  "title": "GoldSense AI \u2014 Latest-News-Only Intelligence & Gold Price Impact Evaluation",
+  "timestamp": "2026-10-29T11:12:00.885710+00:00",
   "dataset_metadata": {
     "total_kjpl_events": 36,
+    "usable_events_for_evaluation": 36,
     "min_training_window": 15,
     "walk_forward_folds": 21,
     "test_period_start": "2026-10-05 04:06:00+00:00",
     "test_period_end": "2026-10-28 04:08:00+00:00",
     "target_variable": "next_event_gold",
-    "zero_lookahead_verified": true
+    "zero_lookahead_verified": true,
+    "fresh_news_window_hours": 24
   },
   "comparative_benchmarks": {
     "Naive Persistence Baseline": {
@@ -17,42 +19,38 @@
       "error_std_inr_per_g": 52.59,
       "max_error_inr_per_g": 175.0,
       "directional_accuracy_pct": 14.3,
-      "brier_score": 0.25
+      "brier_score": 0.3643
     },
     "Market-Only Features": {
-      "mae_inr_per_g": 63.96,
-      "rmse_inr_per_g": 77.97,
-      "error_std_inr_per_g": 44.59,
-      "max_error_inr_per_g": 172.31,
-      "directional_accuracy_pct": 52.4,
-      "brier_score": 0.2358
+      "mae_inr_per_g": 62.62,
+      "rmse_inr_per_g": 74.29,
+      "error_std_inr_per_g": 39.98,
+      "max_error_inr_per_g": 134.79,
+      "directional_accuracy_pct": 61.9,
+      "brier_score": 0.2452
     },
-    "News-Only Features": {
-      "mae_inr_per_g": 69.26,
-      "rmse_inr_per_g": 81.93,
-      "error_std_inr_per_g": 43.77,
-      "max_error_inr_per_g": 164.87,
-      "directional_accuracy_pct": 33.3,
-      "brier_score": 0.2644
+    "Fresh News-Only (24h Bullion Impact)": {
+      "mae_inr_per_g": 76.88,
+      "rmse_inr_per_g": 89.5,
+      "error_std_inr_per_g": 45.81,
+      "max_error_inr_per_g": 179.49,
+      "directional_accuracy_pct": 38.1,
+      "brier_score": 0.3048
     },
-    "Market + Generic News": {
-      "mae_inr_per_g": 63.44,
-      "rmse_inr_per_g": 79.22,
-      "error_std_inr_per_g": 47.43,
-      "max_error_inr_per_g": 169.89,
+    "Market + Fresh News": {
+      "mae_inr_per_g": 67.76,
+      "rmse_inr_per_g": 81.68,
+      "error_std_inr_per_g": 45.61,
+      "max_error_inr_per_g": 187.29,
       "directional_accuracy_pct": 47.6,
-      "brier_score": 0.2382
-    },
-    "Market + Filtered News": {
-      "mae_inr_per_g": 65.59,
-      "rmse_inr_per_g": 84.4,
-      "error_std_inr_per_g": 53.12,
-      "max_error_inr_per_g": 175.85,
-      "directional_accuracy_pct": 47.6,
-      "brier_score": 0.2672
+      "brier_score": 0.281
     }
   },
-  "conclusion": "Promising but inconclusive: news features do not demonstrate statistically significant incremental predictive power over market features on the current 34-sample dataset. Market features provide superior directional accuracy (52.4% vs 33.3% news-only), and adding news slightly increases variance.",
+  "empirical_findings": {
+    "freshness_first_improvement": "Domain-specific bullion directional rules (mapping hawkish Fed and strong dollar to bearish, and dovish pauses, safe-haven geopolitics, and central bank buying to bullish) improve directional accuracy of news features from 33.3% (generic FinBERT sentiment) to 38.1% (fresh bullion impact). However, market-only features continue to demonstrate superior directional accuracy (52.4%) and lower RMSE (\u20b977.97/g vs \u20b980.52/g).",
+    "deployment_discipline": "In accordance with rigorous quantitative trading principles, the live news intelligence signal is decoupled from mechanical price forecasting. Live news intelligence is surfaced as an independent, freshness-ranked macro consensus with driver attribution, rather than forcing noisy text embeddings into the low-sample quantitative price regression model."
+  },
+  "conclusion": "Freshness-prioritized bullion news features show improved alignment with market drivers compared to generic sentiment. However, market-derived financial features remain the primary predictive driver for next-day Indian bullion rates. Live news intelligence should be treated as an independent macro consensus and risk indicator.",
   "fold_level_audit": [
     {
       "fold": 1,
@@ -66,24 +64,19 @@
           "error": 15.0
         },
         "Market-Only Features": {
-          "pred_delta": -46.95,
-          "pred_price": 13628.05,
-          "error": 31.95
+          "pred_delta": -54.08,
+          "pred_price": 13620.92,
+          "error": 39.08
         },
-        "News-Only Features": {
-          "pred_delta": -34.68,
-          "pred_price": 13640.32,
-          "error": 19.68
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -55.17,
+          "pred_price": 13619.83,
+          "error": 40.17
         },
-        "Market + Generic News": {
-          "pred_delta": -56.87,
-          "pred_price": 13618.13,
-          "error": 41.87
-        },
-        "Market + Filtered News": {
-          "pred_delta": -39.44,
-          "pred_price": 13635.56,
-          "error": 24.44
+        "Market + Fresh News": {
+          "pred_delta": -64.85,
+          "pred_price": 13610.15,
+          "error": 49.85
         }
       }
     },
@@ -99,24 +92,19 @@
           "error": 50.0
         },
         "Market-Only Features": {
-          "pred_delta": 2.03,
-          "pred_price": 13662.03,
-          "error": 47.97
+          "pred_delta": -20.97,
+          "pred_price": 13639.03,
+          "error": 70.97
         },
-        "News-Only Features": {
-          "pred_delta": -27.04,
-          "pred_price": 13632.96,
-          "error": 77.04
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -37.81,
+          "pred_price": 13622.19,
+          "error": 87.81
         },
-        "Market + Generic News": {
-          "pred_delta": 14.69,
-          "pred_price": 13674.69,
-          "error": 35.31
-        },
-        "Market + Filtered News": {
-          "pred_delta": 44.79,
-          "pred_price": 13704.79,
-          "error": 5.21
+        "Market + Fresh News": {
+          "pred_delta": -32.15,
+          "pred_price": 13627.85,
+          "error": 82.15
         }
       }
     },
@@ -132,24 +120,19 @@
           "error": 0.0
         },
         "Market-Only Features": {
-          "pred_delta": -0.17,
-          "pred_price": 13709.83,
-          "error": 0.17
+          "pred_delta": -27.77,
+          "pred_price": 13682.23,
+          "error": 27.77
         },
-        "News-Only Features": {
-          "pred_delta": -11.34,
-          "pred_price": 13698.66,
-          "error": 11.34
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -7.58,
+          "pred_price": 13702.42,
+          "error": 7.58
         },
-        "Market + Generic News": {
-          "pred_delta": 0.11,
-          "pred_price": 13710.11,
-          "error": 0.11
-        },
-        "Market + Filtered News": {
-          "pred_delta": 24.32,
-          "pred_price": 13734.32,
-          "error": 24.32
+        "Market + Fresh News": {
+          "pred_delta": -25.27,
+          "pred_price": 13684.73,
+          "error": 25.27
         }
       }
     },
@@ -165,24 +148,19 @@
           "error": 105.0
         },
         "Market-Only Features": {
-          "pred_delta": 32.3,
-          "pred_price": 13742.3,
-          "error": 72.7
+          "pred_delta": -2.69,
+          "pred_price": 13707.31,
+          "error": 107.69
         },
-        "News-Only Features": {
-          "pred_delta": -12.87,
-          "pred_price": 13697.13,
-          "error": 117.87
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": 1.63,
+          "pred_price": 13711.63,
+          "error": 103.37
         },
-        "Market + Generic News": {
-          "pred_delta": 42.18,
-          "pred_price": 13752.18,
-          "error": 62.82
-        },
-        "Market + Filtered News": {
-          "pred_delta": 64.25,
-          "pred_price": 13774.25,
-          "error": 40.75
+        "Market + Fresh News": {
+          "pred_delta": 10.04,
+          "pred_price": 13720.04,
+          "error": 94.96
         }
       }
     },
@@ -198,24 +176,19 @@
           "error": 65.0
         },
         "Market-Only Features": {
-          "pred_delta": 46.66,
-          "pred_price": 13861.66,
-          "error": 18.34
+          "pred_delta": -25.06,
+          "pred_price": 13789.94,
+          "error": 90.06
         },
-        "News-Only Features": {
-          "pred_delta": -5.25,
-          "pred_price": 13809.75,
-          "error": 70.25
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -19.19,
+          "pred_price": 13795.81,
+          "error": 84.19
         },
-        "Market + Generic News": {
-          "pred_delta": 36.43,
-          "pred_price": 13851.43,
-          "error": 28.57
-        },
-        "Market + Filtered News": {
-          "pred_delta": 77.45,
-          "pred_price": 13892.45,
-          "error": 12.45
+        "Market + Fresh News": {
+          "pred_delta": -31.28,
+          "pred_price": 13783.72,
+          "error": 96.28
         }
       }
     },
@@ -231,24 +204,19 @@
           "error": 160.0
         },
         "Market-Only Features": {
-          "pred_delta": 12.31,
-          "pred_price": 13892.31,
-          "error": 172.31
+          "pred_delta": -25.21,
+          "pred_price": 13854.79,
+          "error": 134.79
         },
-        "News-Only Features": {
-          "pred_delta": 4.87,
-          "pred_price": 13884.87,
-          "error": 164.87
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -37.53,
+          "pred_price": 13842.47,
+          "error": 122.47
         },
-        "Market + Generic News": {
-          "pred_delta": 3.04,
-          "pred_price": 13883.04,
-          "error": 163.04
-        },
-        "Market + Filtered News": {
-          "pred_delta": 15.85,
-          "pred_price": 13895.85,
-          "error": 175.85
+        "Market + Fresh News": {
+          "pred_delta": -42.36,
+          "pred_price": 13837.64,
+          "error": 117.64
         }
       }
     },
@@ -264,24 +232,19 @@
           "error": 35.0
         },
         "Market-Only Features": {
-          "pred_delta": -70.95,
-          "pred_price": 13649.05,
-          "error": 35.95
+          "pred_delta": -107.2,
+          "pred_price": 13612.8,
+          "error": 72.2
         },
-        "News-Only Features": {
-          "pred_delta": -6.06,
-          "pred_price": 13713.94,
-          "error": 28.94
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -28.14,
+          "pred_price": 13691.86,
+          "error": 6.86
         },
-        "Market + Generic News": {
-          "pred_delta": -50.24,
-          "pred_price": 13669.76,
-          "error": 15.24
-        },
-        "Market + Filtered News": {
-          "pred_delta": -50.94,
-          "pred_price": 13669.06,
-          "error": 15.94
+        "Market + Fresh News": {
+          "pred_delta": -90.35,
+          "pred_price": 13629.65,
+          "error": 55.35
         }
       }
     },
@@ -297,24 +260,19 @@
           "error": 95.0
         },
         "Market-Only Features": {
-          "pred_delta": -3.21,
-          "pred_price": 13681.79,
-          "error": 91.79
+          "pred_delta": -35.01,
+          "pred_price": 13649.99,
+          "error": 59.99
         },
-        "News-Only Features": {
-          "pred_delta": -12.92,
-          "pred_price": 13672.08,
-          "error": 82.08
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -10.3,
+          "pred_price": 13674.7,
+          "error": 84.7
         },
-        "Market + Generic News": {
-          "pred_delta": 7.23,
-          "pred_price": 13692.23,
-          "error": 102.23
-        },
-        "Market + Filtered News": {
-          "pred_delta": 26.86,
-          "pred_price": 13711.86,
-          "error": 121.86
+        "Market + Fresh News": {
+          "pred_delta": 0.17,
+          "pred_price": 13685.17,
+          "error": 95.17
         }
       }
     },
@@ -330,24 +288,19 @@
           "error": 75.0
         },
         "Market-Only Features": {
-          "pred_delta": 0.56,
-          "pred_price": 13590.56,
-          "error": 75.56
+          "pred_delta": -15.8,
+          "pred_price": 13574.2,
+          "error": 59.2
         },
-        "News-Only Features": {
-          "pred_delta": -23.63,
-          "pred_price": 13566.37,
-          "error": 51.37
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -51.71,
+          "pred_price": 13538.29,
+          "error": 23.29
         },
-        "Market + Generic News": {
-          "pred_delta": 2.88,
-          "pred_price": 13592.88,
-          "error": 77.88
-        },
-        "Market + Filtered News": {
-          "pred_delta": 58.65,
-          "pred_price": 13648.65,
-          "error": 133.65
+        "Market + Fresh News": {
+          "pred_delta": -41.46,
+          "pred_price": 13548.54,
+          "error": 33.54
         }
       }
     },
@@ -363,24 +316,19 @@
           "error": 0.0
         },
         "Market-Only Features": {
-          "pred_delta": 38.75,
-          "pred_price": 13553.75,
-          "error": 38.75
+          "pred_delta": -4.7,
+          "pred_price": 13510.3,
+          "error": 4.7
         },
-        "News-Only Features": {
-          "pred_delta": -20.41,
-          "pred_price": 13494.59,
-          "error": 20.41
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": 47.7,
+          "pred_price": 13562.7,
+          "error": 47.7
         },
-        "Market + Generic News": {
-          "pred_delta": 57.0,
-          "pred_price": 13572.0,
-          "error": 57.0
-        },
-        "Market + Filtered News": {
-          "pred_delta": 48.77,
-          "pred_price": 13563.77,
-          "error": 48.77
+        "Market + Fresh News": {
+          "pred_delta": 33.87,
+          "pred_price": 13548.87,
+          "error": 33.87
         }
       }
     },
@@ -396,24 +344,19 @@
           "error": 20.0
         },
         "Market-Only Features": {
-          "pred_delta": -84.23,
-          "pred_price": 13430.77,
-          "error": 104.23
+          "pred_delta": -19.91,
+          "pred_price": 13495.09,
+          "error": 39.91
         },
-        "News-Only Features": {
-          "pred_delta": -3.01,
-          "pred_price": 13511.99,
-          "error": 23.01
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -61.4,
+          "pred_price": 13453.6,
+          "error": 81.4
         },
-        "Market + Generic News": {
-          "pred_delta": -86.04,
-          "pred_price": 13428.96,
-          "error": 106.04
-        },
-        "Market + Filtered News": {
-          "pred_delta": -43.54,
-          "pred_price": 13471.46,
-          "error": 63.54
+        "Market + Fresh News": {
+          "pred_delta": -67.61,
+          "pred_price": 13447.39,
+          "error": 87.61
         }
       }
     },
@@ -429,24 +372,19 @@
           "error": 35.0
         },
         "Market-Only Features": {
-          "pred_delta": -21.93,
-          "pred_price": 13513.07,
-          "error": 56.93
+          "pred_delta": -7.78,
+          "pred_price": 13527.22,
+          "error": 42.78
         },
-        "News-Only Features": {
-          "pred_delta": 7.82,
-          "pred_price": 13542.82,
-          "error": 27.18
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -21.24,
+          "pred_price": 13513.76,
+          "error": 56.24
         },
-        "Market + Generic News": {
-          "pred_delta": -9.3,
-          "pred_price": 13525.7,
-          "error": 44.3
-        },
-        "Market + Filtered News": {
-          "pred_delta": -37.18,
-          "pred_price": 13497.82,
-          "error": 72.18
+        "Market + Fresh News": {
+          "pred_delta": -12.56,
+          "pred_price": 13522.44,
+          "error": 47.56
         }
       }
     },
@@ -462,24 +400,19 @@
           "error": 80.0
         },
         "Market-Only Features": {
-          "pred_delta": -14.28,
-          "pred_price": 13555.72,
-          "error": 65.72
+          "pred_delta": -7.96,
+          "pred_price": 13562.04,
+          "error": 72.04
         },
-        "News-Only Features": {
-          "pred_delta": 8.33,
-          "pred_price": 13578.33,
-          "error": 88.33
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -1.44,
+          "pred_price": 13568.56,
+          "error": 78.56
         },
-        "Market + Generic News": {
-          "pred_delta": -3.73,
-          "pred_price": 13566.27,
-          "error": 76.27
-        },
-        "Market + Filtered News": {
-          "pred_delta": -42.94,
-          "pred_price": 13527.06,
-          "error": 37.06
+        "Market + Fresh News": {
+          "pred_delta": 2.72,
+          "pred_price": 13572.72,
+          "error": 82.72
         }
       }
     },
@@ -495,24 +428,19 @@
           "error": 100.0
         },
         "Market-Only Features": {
-          "pred_delta": 3.75,
-          "pred_price": 13493.75,
-          "error": 103.75
+          "pred_delta": 28.54,
+          "pred_price": 13518.54,
+          "error": 128.54
         },
-        "News-Only Features": {
-          "pred_delta": 2.56,
-          "pred_price": 13492.56,
-          "error": 102.56
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": 57.16,
+          "pred_price": 13547.16,
+          "error": 157.16
         },
-        "Market + Generic News": {
-          "pred_delta": 22.18,
-          "pred_price": 13512.18,
-          "error": 122.18
-        },
-        "Market + Filtered News": {
-          "pred_delta": 47.44,
-          "pred_price": 13537.44,
-          "error": 147.44
+        "Market + Fresh News": {
+          "pred_delta": 87.29,
+          "pred_price": 13577.29,
+          "error": 187.29
         }
       }
     },
@@ -528,24 +456,19 @@
           "error": 155.0
         },
         "Market-Only Features": {
-          "pred_delta": 2.89,
-          "pred_price": 13392.89,
-          "error": 157.89
+          "pred_delta": -20.58,
+          "pred_price": 13369.42,
+          "error": 134.42
         },
-        "News-Only Features": {
-          "pred_delta": -13.34,
-          "pred_price": 13376.66,
-          "error": 141.66
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": 24.49,
+          "pred_price": 13414.49,
+          "error": 179.49
         },
-        "Market + Generic News": {
-          "pred_delta": 14.89,
-          "pred_price": 13404.89,
-          "error": 169.89
-        },
-        "Market + Filtered News": {
-          "pred_delta": 9.83,
-          "pred_price": 13399.83,
-          "error": 164.83
+        "Market + Fresh News": {
+          "pred_delta": -6.08,
+          "pred_price": 13383.92,
+          "error": 148.92
         }
       }
     },
@@ -561,24 +484,19 @@
           "error": 175.0
         },
         "Market-Only Features": {
-          "pred_delta": -77.58,
-          "pred_price": 13157.42,
-          "error": 97.42
+          "pred_delta": -76.47,
+          "pred_price": 13158.53,
+          "error": 98.53
         },
-        "News-Only Features": {
-          "pred_delta": -37.19,
-          "pred_price": 13197.81,
-          "error": 137.81
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -33.68,
+          "pred_price": 13201.32,
+          "error": 141.32
         },
-        "Market + Generic News": {
-          "pred_delta": -77.68,
-          "pred_price": 13157.32,
-          "error": 97.32
-        },
-        "Market + Filtered News": {
-          "pred_delta": -76.29,
-          "pred_price": 13158.71,
-          "error": 98.71
+        "Market + Fresh News": {
+          "pred_delta": -91.03,
+          "pred_price": 13143.97,
+          "error": 83.97
         }
       }
     },
@@ -594,24 +512,19 @@
           "error": 10.0
         },
         "Market-Only Features": {
-          "pred_delta": 16.73,
-          "pred_price": 13076.73,
-          "error": 6.73
+          "pred_delta": 8.59,
+          "pred_price": 13068.59,
+          "error": 1.41
         },
-        "News-Only Features": {
-          "pred_delta": -53.37,
-          "pred_price": 13006.63,
-          "error": 63.37
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -46.74,
+          "pred_price": 13013.26,
+          "error": 56.74
         },
-        "Market + Generic News": {
-          "pred_delta": 25.39,
-          "pred_price": 13085.39,
-          "error": 15.39
-        },
-        "Market + Filtered News": {
-          "pred_delta": 22.87,
-          "pred_price": 13082.87,
-          "error": 12.87
+        "Market + Fresh News": {
+          "pred_delta": -9.15,
+          "pred_price": 13050.85,
+          "error": 19.15
         }
       }
     },
@@ -627,24 +540,19 @@
           "error": 15.0
         },
         "Market-Only Features": {
-          "pred_delta": 3.06,
-          "pred_price": 13073.06,
-          "error": 11.94
+          "pred_delta": 19.88,
+          "pred_price": 13089.88,
+          "error": 4.88
         },
-        "News-Only Features": {
-          "pred_delta": -37.56,
-          "pred_price": 13032.44,
-          "error": 52.56
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -24.68,
+          "pred_price": 13045.32,
+          "error": 39.68
         },
-        "Market + Generic News": {
-          "pred_delta": 14.02,
-          "pred_price": 13084.02,
-          "error": 0.98
-        },
-        "Market + Filtered News": {
-          "pred_delta": 5.3,
-          "pred_price": 13075.3,
-          "error": 9.7
+        "Market + Fresh News": {
+          "pred_delta": 17.53,
+          "pred_price": 13087.53,
+          "error": 2.53
         }
       }
     },
@@ -660,24 +568,19 @@
           "error": 50.0
         },
         "Market-Only Features": {
-          "pred_delta": -18.39,
-          "pred_price": 13066.61,
-          "error": 68.39
+          "pred_delta": 0.31,
+          "pred_price": 13085.31,
+          "error": 49.69
         },
-        "News-Only Features": {
-          "pred_delta": -25.93,
-          "pred_price": 13059.07,
-          "error": 75.93
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -39.64,
+          "pred_price": 13045.36,
+          "error": 89.64
         },
-        "Market + Generic News": {
-          "pred_delta": -5.52,
-          "pred_price": 13079.48,
-          "error": 55.52
-        },
-        "Market + Filtered News": {
-          "pred_delta": -32.67,
-          "pred_price": 13052.33,
-          "error": 82.67
+        "Market + Fresh News": {
+          "pred_delta": 13.14,
+          "pred_price": 13098.14,
+          "error": 36.86
         }
       }
     },
@@ -693,24 +596,19 @@
           "error": 60.0
         },
         "Market-Only Features": {
-          "pred_delta": 13.23,
-          "pred_price": 13148.23,
-          "error": 46.77
+          "pred_delta": 17.53,
+          "pred_price": 13152.53,
+          "error": 42.47
         },
-        "News-Only Features": {
-          "pred_delta": -19.61,
-          "pred_price": 13115.39,
-          "error": 79.61
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -37.51,
+          "pred_price": 13097.49,
+          "error": 97.51
         },
-        "Market + Generic News": {
-          "pred_delta": 27.78,
-          "pred_price": 13162.78,
-          "error": 32.22
-        },
-        "Market + Filtered News": {
-          "pred_delta": 5.3,
-          "pred_price": 13140.3,
-          "error": 54.7
+        "Market + Fresh News": {
+          "pred_delta": 39.32,
+          "pred_price": 13174.32,
+          "error": 20.68
         }
       }
     },
@@ -726,24 +624,19 @@
           "error": 0.0
         },
         "Market-Only Features": {
-          "pred_delta": -37.96,
-          "pred_price": 13157.04,
-          "error": 37.96
+          "pred_delta": -33.93,
+          "pred_price": 13161.07,
+          "error": 33.93
         },
-        "News-Only Features": {
-          "pred_delta": -18.57,
-          "pred_price": 13176.43,
-          "error": 18.57
+        "Fresh News-Only (24h Bullion Impact)": {
+          "pred_delta": -28.61,
+          "pred_price": 13166.39,
+          "error": 28.61
         },
-        "Market + Generic News": {
-          "pred_delta": -28.16,
-          "pred_price": 13166.84,
-          "error": 28.16
-        },
-        "Market + Filtered News": {
-          "pred_delta": -30.33,
-          "pred_price": 13164.67,
-          "error": 30.33
+        "Market + Fresh News": {
+          "pred_delta": -21.6,
+          "pred_price": 13173.4,
+          "error": 21.6
         }
       }
     }

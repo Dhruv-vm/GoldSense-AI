@@ -5,6 +5,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [2.2.0-develop] - 2026-10-29
+
+### Added
+- **Freshness-First Live News Signal & Commodity Impact Engine**:
+  - `backend/app/services/sentiment/gold_impact.py`: Evaluates domain-specific bullion directional impact (`BULLISH`, `BEARISH`, `MIXED`, `UNCERTAIN`), attributing macroeconomic events across Fed monetary policy, US Dollar FX, safe-haven geopolitics, physical retail demand, central bank reserves, and momentum.
+  - Formulates exponential recency decay $w = e^{-\Delta t / 12}$ (half-life of 12 hours) and semantic token stem clustering (`extract_cluster_key`) to deduplicate syndicated wire reprints (e.g. Reuters/PTI duplicates).
+  - Grounded explanatory evidence rationale for every scored story.
+- **Real-Time Live Signal Aggregator & Endpoints**:
+  - `backend/app/services/sentiment/live_signal.py`: Aggregates fresh articles strictly within a configurable recency window (default: 24h, support for 48h/72h).
+  - Compares news directional consensus against live intraday market movements (`market_vs_news_alignment`: `AGREES_BULLISH`, `AGREES_BEARISH`, `DIVERGES`, `NEUTRAL`).
+  - Transparent safety guard returning `INSUFFICIENT_FRESH_RELEVANT_NEWS` if fewer than 2 distinct fresh story clusters exist.
+  - Endpoint `GET /api/news/live-signal?window_hours=24` returning structured consensus metrics, macro driver distributions, and representative articles.
+  - Endpoint `GET /api/news/latest?window_hours=24&limit=30` enriched with bullion impact badges, macro drivers, confidence, and evidence rationale.
+- **Decoupled Architecture in ML Predictor & Frontend**:
+  - Updated `backend/app/services/prediction/predictor.py` to expose the fresh news intelligence signal cleanly decoupled alongside the market macro snapshot, preventing noisy sentiment embeddings from corrupting the low-sample quantitative price regression.
+  - Upgraded Next.js 16 frontend terminal (`frontend/app/page.tsx`):
+    - Added recency window toggle (`24h (Live)`, `48h`, `72h`).
+    - Added Live Macro Consensus banner displaying net bullion direction, confidence, market alignment, and macro driver counts.
+    - Upgraded News Feed with bullion directional impact badges (`BULLISH FOR GOLD`, `BEARISH FOR GOLD`, `MIXED`), driver tags, confidence ratings, and evidence rationale.
+    - Added Live News Intelligence card to AI Predictions tab.
+- **Walk-Forward Fresh News Evaluation**:
+  - `backend/ml/training/fresh_news_walk_forward.py`: Zero-lookahead 21-fold backtest comparing Naive Persistence vs. Market-Only vs. Fresh News-Only vs. Market + Fresh News.
+  - Confirmed bullion directional impact rules improve news-only directional accuracy from 33.3% to 38.1%, while market features dominate short-horizon pricing (61.9% directional accuracy, ₹74.29 RMSE).
+- **Test Suite Expansion**:
+  - Added `backend/tests/test_gold_impact_and_live_signal.py` testing directional commodity logic, syndicated clustering, recency window enforcement, API endpoints, and insufficient fresh news guards.
+  - Expanded backend test suite to **80 passing tests (100% pass rate)**.
+
+---
+
 ## [2.1.0-develop] - 2026-10-29
 
 ### Added

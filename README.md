@@ -26,11 +26,15 @@
 - **Privacy & Multi-User Architecture**: Multi-user isolation built in using persistent `user_id` attributes (via `X-User-ID` session headers), strictly isolating personal portfolio records.
 - *Explicit Non-Commercial Scope*: Focuses purely on personal wealth monitoring — zero commercial POS, invoicing, customer CRM, or merchant selling workflows.
 
-### 3. Financial News Intelligence & FinBERT Sentiment
-- **Automated Collector**: Continuous RSS ingestion from premium financial desks (Reuters, Bloomberg, CNBC, Financial Express, Economic Times).
-- **Domain Relevance Engine**: High-precision keyword filtering (`gold`, `bullion`, `central bank`, `precious metals`, `xauusd`).
-- **FinBERT NLP Sentiment**: Pre-trained financial sentiment analysis scoring each article on Bullish / Bearish / Neutral orientation, confidence, and gold impact magnitude.
-- **Synchronized Cache**: Full sync between raw news (`data/news/news_articles.csv`) and analyzed cache (`ml/data/processed/analyzed_news.csv`) with automatic backfill.
+### 3. Freshness-First Bullion News Intelligence & Macro Driver Attribution
+- **Automated Collector**: Continuous RSS and GDELT 2.0 ingestion from premium financial desks (Reuters, Bloomberg, CNBC, Financial Express, Economic Times).
+- **Domain Relevance Engine**: High-precision multi-driver taxonomy categorizing news across Fed monetary policy, US Dollar FX, safe-haven geopolitics, physical retail demand, central bank accumulation, and market momentum.
+- **Commodity Directional Impact Ranking**: Replaces generic financial sentiment with bullion-specific economic transmission logic (e.g., hawkish Fed / strong dollar -> Bearish for gold; rate cuts, safe-haven geopolitics, central bank buying -> Bullish for gold).
+- **Syndicated Wire Clustering**: Semantic stem clustering deduplicates wire reprints (Reuters/PTI syndications) to prevent repeated headlines from artificially inflating sentiment scores.
+- **Freshness Prioritization & Time-Decay**: Configurable recency windows (24h default, 48h, 72h) with exponential time-decay ($e^{-\Delta t / 12}$) prioritizing immediate market-moving catalysts.
+- **Decoupled Macro Consensus & Transparent Endpoints**:
+  - `GET /api/news/live-signal?window_hours=24`: Returns net directional consensus (`BULLISH`, `BEARISH`, `MIXED`, `NEUTRAL`), confidence level, driver breakdown, market vs. news alignment, and explicit `INSUFFICIENT_FRESH_RELEVANT_NEWS` guard if fewer than 2 distinct fresh clusters exist.
+  - `GET /api/news/latest?window_hours=24&limit=30`: Enriched with bullion impact, macro driver category, confidence, and explanatory evidence rationale for each story.
 
 ### 4. Machine Learning Forecasting Engine
 - **Target**: Next-event KJPL Gold rate (`next_event_gold`) and anticipated price delta.
@@ -183,15 +187,19 @@ cd backend
 source .venv/bin/activate
 pytest tests/ -v
 ```
-All **69 unit and integration tests** validate:
+All **80 unit and integration tests** validate:
 - Dynamic conversion math (Troy oz to grams, USD/INR conversion).
 - Domestic premium and Indian customs duty parity.
 - Portfolio fine weight calculations across 999.9, 995, 916, 750 purities.
 - Multi-user portfolio isolation and CRUD constraints.
 - Prediction service graceful handling of experimental sample counts (<50).
+- Bullion directional impact mapping and macroeconomic driver attribution.
+- Syndicated wire clustering and deduplication.
+- Live freshness-first news signal aggregation and recency window enforcement.
+- Insufficient fresh news safety guard (`INSUFFICIENT_FRESH_RELEVANT_NEWS`).
 - Zero-lookahead feature alignment invariants.
 - Pipeline output validation and evaluation artifact integrity.
-- API endpoints for rate overview, debounced refresh, alerts, and news feeds.
+- API endpoints for rate overview, debounced refresh, alerts, and live news signals.
 
 ---
 

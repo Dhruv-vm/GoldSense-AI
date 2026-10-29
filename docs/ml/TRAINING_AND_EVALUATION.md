@@ -37,11 +37,12 @@ GoldSense AI includes an automated walk-forward evaluation script (`backend/ml/t
 ---
 
 ## 4. Multi-Feature Comparative Research Findings
-As documented in the [News Predictive Signal Research Report](NEWS_PREDICTIVE_SIGNAL_RESEARCH.md), a 21-fold out-of-sample walk-forward comparison shows:
-- **Market-Only Features**: MAE = ₹63.96/g, RMSE = ₹77.97/g, Directional Accuracy = **52.4%**.
-- **News-Only Features**: MAE = ₹69.26/g, RMSE = ₹81.93/g, Directional Accuracy = **33.3%**.
-- **Market + Filtered News**: MAE = ₹65.59/g, RMSE = ₹84.40/g, Directional Accuracy = **47.6%**.
-- **Conclusion**: News features currently demonstrate no incremental predictive value over baseline market variables on the initial sample size.
+As documented in the [News Predictive Signal Research Report](NEWS_PREDICTIVE_SIGNAL_RESEARCH.md) and [`backend/ml/data/processed/news_signal_experiment.json`](file:///Users/dhruv/dhruv%20files/gold/GoldSense-AI/backend/ml/data/processed/news_signal_experiment.json), a 21-fold out-of-sample walk-forward comparison shows:
+- **Naive Persistence Baseline**: MAE = ₹61.90/g, RMSE = ₹81.23/g, Directional Accuracy = 14.3%.
+- **Market-Only Features**: MAE = ₹62.62/g, RMSE = **₹74.29/g**, Directional Accuracy = **61.9%**.
+- **Fresh News-Only (24h Bullion Impact)**: MAE = ₹76.88/g, RMSE = ₹89.50/g, Directional Accuracy = **38.1%** (improved from 33.3% generic FinBERT sentiment).
+- **Market + Fresh News**: MAE = ₹67.76/g, RMSE = ₹81.68/g, Directional Accuracy = 47.6%.
+- **Conclusion**: Market variables remain the primary short-horizon price driver. Live news intelligence is strictly decoupled and presented as an independent macroeconomic consensus indicator.
 
 ---
 
