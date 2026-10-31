@@ -187,13 +187,22 @@ def run_collection(
             "Accept-Language": "en-US,en;q=0.9",
         }
 
-        try:
-            resp = http.get(source_url, timeout=30, headers=headers)
-            resp.raise_for_status()
-            html_content = resp.text
-        except Exception as exc:
+        last_exc = None
+        for attempt in range(1, 4):
+            try:
+                resp = http.get(source_url, timeout=30, headers=headers)
+                resp.raise_for_status()
+                html_content = resp.text
+                break
+            except Exception as exc:
+                last_exc = exc
+                print(f"[KJPL COLLECTOR] Fetch attempt {attempt}/3 failed: {exc}")
+                if attempt < 3:
+                    time.sleep(3)
+
+        if html_content is None:
             duration = round(time.time() - start_time, 2)
-            error_msg = f"HTTP fetch failed from {source_url}: {exc}"
+            error_msg = f"HTTP fetch failed from {source_url} after 3 attempts: {last_exc}"
             print(f"[KJPL COLLECTOR] ERROR: {error_msg}")
 
             # Try logging failed run to DB if available
@@ -207,20 +216,20 @@ def run_collection(
                         records_inserted=0,
                         records_changed=0,
                         duration_seconds=duration,
-                        error_message=str(exc),
+                        error_message=str(last_exc),
                         executed_at=now_utc,
                     ))
                     ds = s.query(DataSourceStatus).filter_by(source_name="KJPL").first()
                     if ds:
                         ds.last_failed_run = now_utc
                         ds.current_status = "DOWN"
-                        ds.error_message = str(exc)
+                        ds.error_message = str(last_exc)
                         ds.updated_at = now_utc
                     s.commit()
             except Exception:
                 pass
 
-            raise
+            raise last_exc
 
     # Parse all city-wise and benchmark rates
     payload = parse_kjpl_all_city_rates(html_content, reference_time=now_ist)

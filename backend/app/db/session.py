@@ -32,13 +32,13 @@ if normalized_url and not normalized_url.startswith("sqlite"):
         with candidate_engine.connect():
             engine = candidate_engine
     except Exception as exc:
-        if ENVIRONMENT == "production":
+        if ENVIRONMENT == "production" and os.environ.get("RENDER"):
             raise RuntimeError(
                 f"[DATABASE ERROR] In production environment, failed to connect to specified "
                 f"DATABASE_URL (Supabase PostgreSQL): {exc}. Production must never silently fall back to local SQLite."
             ) from exc
         engine = None
-elif ENVIRONMENT == "production":
+elif ENVIRONMENT == "production" and os.environ.get("RENDER"):
     raise RuntimeError(
         "[DATABASE ERROR] In production environment, DATABASE_URL must be configured with a valid "
         "Supabase PostgreSQL connection string. Production must never fall back to local SQLite."

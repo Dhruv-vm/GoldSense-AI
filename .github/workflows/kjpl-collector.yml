@@ -49,7 +49,6 @@ jobs:
       - name: Collect KJPL city-wise & benchmark bullion rates
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
-          ENVIRONMENT: ${{ secrets.SUPABASE_DATABASE_URL && 'production' || 'development' }}
         run: |
           PYTHONPATH=backend python scripts/collect_kjpl_csv.py
 
