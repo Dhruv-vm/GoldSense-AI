@@ -64,6 +64,17 @@ jobs:
             echo "[KJPL WORKFLOW] Rates unchanged. No new observation rows to commit."
           else
             git commit -m "data: collect city-wise KJPL bullion rates"
-            git pull --rebase origin develop
-            git push origin develop
+
+            MAX_RETRIES=4
+            for attempt in $(seq 1 $MAX_RETRIES); do
+              echo "[KJPL WORKFLOW] Push attempt $attempt of $MAX_RETRIES..."
+              if git pull --rebase origin develop && git push origin develop; then
+                echo "[KJPL WORKFLOW] Successfully pushed bullion updates."
+                exit 0
+              fi
+              echo "[KJPL WORKFLOW] Push failed or encountered concurrent update. Retrying in 5 seconds..."
+              sleep 5
+            done
+            echo "[KJPL WORKFLOW] ERROR: Failed to push after $MAX_RETRIES attempts."
+            exit 1
           fi
