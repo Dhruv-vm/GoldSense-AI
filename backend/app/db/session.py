@@ -11,10 +11,24 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "development").lower()
 IS_POSTGRES = bool(DATABASE_URL and not str(DATABASE_URL).startswith("sqlite"))
 
+
+def normalize_database_url(url: str | None) -> str | None:
+    """Normalize postgres:// and postgresql:// URIs to use psycopg v3 driver."""
+    if not url:
+        return None
+    url = url.strip()
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
+    if url.startswith("postgresql://") and not url.startswith("postgresql+"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return url
+
+
 engine = None
-if DATABASE_URL and not DATABASE_URL.startswith("sqlite"):
+normalized_url = normalize_database_url(DATABASE_URL)
+if normalized_url and not normalized_url.startswith("sqlite"):
     try:
-        candidate_engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+        candidate_engine = create_engine(normalized_url, pool_pre_ping=True)
         with candidate_engine.connect():
             engine = candidate_engine
     except Exception as exc:
