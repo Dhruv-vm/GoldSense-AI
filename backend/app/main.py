@@ -2,6 +2,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.bullion import router as bullion_router
+from app.api.routes.data_monitor import router as data_monitor_router
 from app.api.routes.kjpl import router as kjpl_router
 from app.api.routes.market import router as market_router
 from app.api.routes.prediction import router as prediction_router
@@ -10,11 +12,16 @@ from app.api.routes.alerts import router as alerts_router
 from app.api.routes.news import router as news_router
 from app.jobs.scheduler import start_scheduler, stop_scheduler
 from app.services.data_service import init_database
+from app.services.kjpl.persistence import seed_bullion_metadata
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_database()
+    try:
+        seed_bullion_metadata()
+    except Exception as e:
+        print(f"[LIFESPAN] Seed metadata note: {e}")
     try:
         start_scheduler()
     except Exception as e:
@@ -27,8 +34,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="GoldSense AI",
-    description="Bullion Intelligence, Personal Portfolio Tracking, and AI Gold-Price Prediction Platform",
+    title="VMD Bullion Intelligence Terminal",
+    description="Bloomberg-inspired Institutional Indian Bullion Intelligence Terminal",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -42,6 +49,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(bullion_router)
+app.include_router(data_monitor_router)
 app.include_router(kjpl_router)
 app.include_router(market_router)
 app.include_router(prediction_router)
@@ -52,4 +61,4 @@ app.include_router(news_router)
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "GoldSense AI API", "version": "1.0.0"}
+    return {"status": "ok", "service": "VMD Bullion API", "version": "1.0.0"}

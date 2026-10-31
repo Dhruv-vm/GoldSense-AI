@@ -326,13 +326,14 @@ def refresh_market_data() -> dict[str, Any]:
                         "source": "Yahoo Finance",
                     })
 
-        LAST_REFRESH_TIME = now
+        LAST_REFRESH_TIME = time.time()
         overview = get_market_overview()
         overview["message"] = "Market data successfully refreshed."
         overview["refreshed"] = True
         return overview
 
     except Exception as e:
+        LAST_REFRESH_TIME = time.time()
         overview = get_market_overview()
         overview["message"] = f"Refresh attempt encountered provider error: {str(e)}. Retaining last-known-good observation."
         overview["refreshed"] = False

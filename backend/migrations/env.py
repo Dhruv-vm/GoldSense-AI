@@ -19,10 +19,8 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 from app.db.base import Base
-from app.models.gold_rate import GoldRate
-from app.models.market_rate import MarketRate
-from app.models.prediction import Prediction
-from app.models.feature_snapshot import FeatureSnapshot
+from app.db.session import engine as app_engine
+import app.models  # Load all models
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -62,11 +60,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    connectable = app_engine
 
     with connectable.connect() as connection:
         context.configure(

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>KJPL - Live Bullion Rates</title>
+</head>
+<body>
+    <div class="header">
+        <span class="mjdma_data">Time : 09:35 am</span>
+        <span class="gold-rate">13,040.00</span>
+        <span class="silver-rate">210.00</span>
+    </div>
+
+    <div class="mjdta-table-container">
+        <table>
+            <tr>
+                <td><strong>MJDTA RATE (WITH GST)</strong></td>
+            </tr>
+            <tr>
+                <td>GOLD</td>
+                <td>13,431.20</td>
+            </tr>
+            <tr>
+                <td>SILVER</td>
+                <td>216.30</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="city-products-container">
+        <table id="city-bullion-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Type</th>
+                    <th>ID</th>
+                    <th>Weight</th>
+                    <th>Sell Rate</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr data-com-id="47" data-com-name="GOLD 1KG 99.99">
+                    <td class="product-name">GOLD 1KG 99.99</td>
+                    <td>Gold-1</td>
+                    <td class="product-id">47</td>
+                    <td>1.000</td>
+                    <td class="rate">13085000.00</td>
+                    <td>30-10-2026</td>
+                </tr>
+                <tr data-com-id="48" data-com-name="GOLD 100 GMS 999 Chennai">
+                    <td class="product-name">GOLD 100 GMS 999 Chennai</td>
+                    <td>Gold-1</td>
+                    <td class="product-id">48</td>
+                    <td>100.000</td>
+                    <td class="rate">1308500.00</td>
+                    <td>30-10-2026</td>
+                </tr>
+                <tr data-com-id="49" data-com-name="GOLD 100 GMS 999 Bangalore">
+                    <td class="product-name">GOLD 100 GMS 999 Bangalore</td>
+                    <td>Gold-1</td>
+                    <td class="product-id">49</td>
+                    <td>100.000</td>
+                    <td class="rate">1309200.00</td>
+                    <td>30-10-2026</td>
+                </tr>
+                <tr data-com-id="50" data-com-name="GOLD 100 GMS 999 Mumbai">
+                    <td class="product-name">GOLD 100 GMS 999 Mumbai</td>
+                    <td>Gold-1</td>
+                    <td class="product-id">50</td>
+                    <td>100.000</td>
+                    <td class="rate">1307800.00</td>
+                    <td>30-10-2026</td>
+                </tr>
+                <tr data-com-id="51" data-com-name="GOLD 100 GMS 999 Coimbatore">
+                    <td class="product-name">GOLD 100 GMS 999 Coimbatore</td>
+                    <td>Gold-1</td>
+                    <td class="product-id">51</td>
+                    <td>100.000</td>
+                    <td class="rate">1308900.00</td>
+                    <td>30-10-2026</td>
+                </tr>
+                <tr data-com-id="52" data-com-name="GOLD 100 GMS 999 Hyderabad">
+                    <td class="product-name">GOLD 100 GMS 999 Hyderabad</td>
+                    <td>Gold-1</td>
+                    <td class="product-id">52</td>
+                    <td>100.000</td>
+                    <td class="rate">1309500.00</td>
+                    <td>30-10-2026</td>
+                </tr>
+                <tr data-com-id="2" data-com-name="SPOT-SILVER">
+                    <td class="product-name">SPOT-SILVER</td>
+                    <td>Silver-1</td>
+                    <td class="product-id">2</td>
+                    <td>1.000</td>
+                    <td class="rate">210.00</td>
+                    <td>30-10-2026</td>
+                </tr>
+                <tr data-com-id="12" data-com-name="SILVER 1KG 999 Chennai">
+                    <td class="product-name">SILVER 1KG 999 Chennai</td>
+                    <td>Silver-1</td>
+                    <td class="product-id">12</td>
+                    <td>1.000</td>
+                    <td class="rate">210000.00</td>
+                    <td>30-10-2026</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Embedded or AJAX JSON feed script that KJPL renders for WebSocket/live updates -->
+    <script id="commodity-data" type="application/json">
+    [
+        {"com_id": "47", "com_name": "GOLD 1KG 99.99", "displyname": "Gold-1", "com_weight": "1.000", "sellrate": "13085000.00", "selldiff": "0.00", "buydiff": "0.00"},
+        {"com_id": "48", "com_name": "GOLD 100 GMS 999 Chennai", "displyname": "Gold-1", "com_weight": "100.00", "sellrate": "1308500.00", "selldiff": "0.00", "buydiff": "0.00"},
+        {"com_id": "49", "com_name": "GOLD 100 GMS 999 Bangalore", "displyname": "Gold-1", "com_weight": "100.00", "sellrate": "1309200.00", "selldiff": "700.00", "buydiff": "0.00"},
+        {"com_id": "50", "com_name": "GOLD 100 GMS 999 Mumbai", "displyname": "Gold-1", "com_weight": "100.00", "sellrate": "1307800.00", "selldiff": "-700.00", "buydiff": "0.00"},
+        {"com_id": "51", "com_name": "GOLD 100 GMS 999 Coimbatore", "displyname": "Gold-1", "com_weight": "100.00", "sellrate": "1308900.00", "selldiff": "400.00", "buydiff": "0.00"},
+        {"com_id": "52", "com_name": "GOLD 100 GMS 999 Hyderabad", "displyname": "Gold-1", "com_weight": "100.00", "sellrate": "1309500.00", "selldiff": "1000.00", "buydiff": "0.00"},
+        {"com_id": "2", "com_name": "SPOT-SILVER", "displyname": "Silver-1", "com_weight": "1.000", "sellrate": "210.00", "selldiff": "0.00", "buydiff": "0.00"},
+        {"com_id": "12", "com_name": "SILVER 1KG 999 Chennai", "displyname": "Silver-1", "com_weight": "1.000", "sellrate": "210000.00", "selldiff": "0.00", "buydiff": "0.00"}
+    ]
+    </script>
+</body>
+</html>

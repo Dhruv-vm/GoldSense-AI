@@ -3,24 +3,25 @@ name: KJPL Rate Collector
 on:
   schedule:
     # All times in UTC (IST = UTC + 5:30)
-    # GitHub Actions public runner schedule queue experiences an empirical ~4-hour backlog
-    # in the morning and ~3-hour backlog in the afternoon.
-    # We pre-shift the crons by the measured queue backlog and use off-peak minutes (:08, :38)
-    # so that actual runner execution lands precisely within the target market publication windows:
+    # Target publication windows:
     #   Morning Window : ~10:15 AM - 11:30 AM IST (KJPL morning rate published ~09:30-10:00 AM)
     #   Evening Window : ~05:15 PM - 06:30 PM IST (KJPL evening rate published ~04:30-05:30 PM)
 
-    # Morning target window (~10:15 AM - 11:30 AM IST) - pre-shifted by ~4h:
-    - cron: '38 0 * * *'   # 06:08 AM IST scheduled -> executes ~10:15 - 10:30 AM IST (Morning early backup)
-    - cron: '8 1 * * *'    # 06:38 AM IST scheduled -> executes ~10:45 - 11:00 AM IST (Morning primary)
-    - cron: '38 1 * * *'   # 07:08 AM IST scheduled -> executes ~11:15 - 11:30 AM IST (Morning late backup)
+    # Morning target window (~10:15 AM - 11:30 AM IST) - pre-shifted for runner backlog:
+    - cron: '38 0 * * *'   # Morning early backup
+    - cron: '8 1 * * *'    # Morning primary
+    - cron: '38 1 * * *'   # Morning late backup
 
-    # Evening target window (~05:15 PM - 06:40 PM IST) - pre-shifted by ~4-4.5h queue delay:
-    - cron: '38 7 * * *'   # 01:08 PM IST scheduled -> executes ~05:15 - 05:45 PM IST (Evening early backup)
-    - cron: '8 8 * * *'    # 01:38 PM IST scheduled -> executes ~05:45 - 06:15 PM IST (Evening primary)
-    - cron: '38 8 * * *'   # 02:08 PM IST scheduled -> executes ~06:15 - 06:45 PM IST (Evening late backup)
+    # Evening target window (~05:15 PM - 06:40 PM IST) - pre-shifted:
+    - cron: '38 7 * * *'   # Evening early backup
+    - cron: '8 8 * * *'    # Evening primary
+    - cron: '38 8 * * *'   # Evening late backup
 
   workflow_dispatch:
+
+concurrency:
+  group: kjpl-collector-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -32,6 +33,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -41,22 +44,26 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests beautifulsoup4
+          pip install requests beautifulsoup4 sqlalchemy pydantic psycopg[binary]
 
-      - name: Collect KJPL rate
-        run: python scripts/collect_kjpl_csv.py
+      - name: Collect KJPL city-wise & benchmark bullion rates
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          ENVIRONMENT: ${{ secrets.SUPABASE_DATABASE_URL && 'production' || 'development' }}
+        run: |
+          PYTHONPATH=backend python scripts/collect_kjpl_csv.py
 
       - name: Commit collected data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add data/kjpl/kjpl_rates.csv
+          git add data/kjpl/kjpl_rates.csv data/kjpl/city_rates.csv
 
           if git diff --cached --quiet; then
-            echo "[KJPL WORKFLOW] No new KJPL data to commit."
+            echo "[KJPL WORKFLOW] Rates unchanged. No new observation rows to commit."
           else
-            git commit -m "data: collect KJPL rate"
+            git commit -m "data: collect city-wise KJPL bullion rates"
             git pull --rebase origin develop
             git push origin develop
           fi
