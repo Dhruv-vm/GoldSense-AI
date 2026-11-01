@@ -48,12 +48,20 @@ DEFAULT_PRODUCTS = [
 def seed_bullion_metadata(session: Any = None) -> None:
     """
     Ensure 5 mandatory cities and default bullion products exist in database.
-    Idempotent and safe.
+    Idempotent and safe. Auto-creates schema if tables do not exist yet.
     """
     own_session = False
     if session is None:
         session = SessionLocal()
         own_session = True
+
+    try:
+        from app.db.base import Base
+        from app.db.session import engine
+        import app.models  # Register all models before create_all
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"[METADATA SEED] Schema create notice: {e}")
 
     try:
         # Seed cities
@@ -231,21 +239,6 @@ def persist_parsed_payload(
 
         session.commit()
 
-        # Mirror to CSV file
-        if csv_rows_to_append:
-            CITY_RATES_CSV.parent.mkdir(parents=True, exist_ok=True)
-            file_exists = CITY_RATES_CSV.exists() and CITY_RATES_CSV.stat().st_size > 0
-            with CITY_RATES_CSV.open("a", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=[
-                    "observed_at", "city_code", "city_display_name", "product_id",
-                    "product_name", "metal", "purity", "weight", "unit", "price",
-                    "currency", "rate_type", "published_time", "source"
-                ])
-                if not file_exists:
-                    writer.writeheader()
-                for row in csv_rows_to_append:
-                    writer.writerow(row)
-
         return {
             "status": "SUCCESS",
             "records_extracted": len(payload.city_rates),
@@ -256,7 +249,33 @@ def persist_parsed_payload(
 
     except Exception as e:
         session.rollback()
-        raise e
+        print(f"[PERSISTENCE] Database write notice: {e}. Preserving CSV mirror.")
+        return {
+            "status": "PARTIAL_CSV_ONLY",
+            "records_extracted": len(payload.city_rates),
+            "records_inserted": 0,
+            "records_changed": 0,
+            "timestamp": now_utc.isoformat(),
+            "warning": str(e),
+        }
     finally:
+        # Always mirror to CSV file regardless of DB status
+        if csv_rows_to_append:
+            try:
+                CITY_RATES_CSV.parent.mkdir(parents=True, exist_ok=True)
+                file_exists = CITY_RATES_CSV.exists() and CITY_RATES_CSV.stat().st_size > 0
+                with CITY_RATES_CSV.open("a", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fieldnames=[
+                        "observed_at", "city_code", "city_display_name", "product_id",
+                        "product_name", "metal", "purity", "weight", "unit", "price",
+                        "currency", "rate_type", "published_time", "source"
+                    ])
+                    if not file_exists:
+                        writer.writeheader()
+                    for row in csv_rows_to_append:
+                        writer.writerow(row)
+            except Exception as ce:
+                print(f"[CSV MIRROR] Write note: {ce}")
+
         if own_session:
             session.close()

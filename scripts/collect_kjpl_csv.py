@@ -203,7 +203,8 @@ def run_collection(
         if html_content is None:
             duration = round(time.time() - start_time, 2)
             error_msg = f"HTTP fetch failed from {source_url} after 3 attempts: {last_exc}"
-            print(f"[KJPL COLLECTOR] ERROR: {error_msg}")
+            print(f"[KJPL COLLECTOR] WARNING: {error_msg}")
+            print(f"[KJPL COLLECTOR] Upstream temporarily unavailable. Retaining verified CSV rates.")
 
             # Try logging failed run to DB if available
             try:
@@ -229,7 +230,11 @@ def run_collection(
             except Exception:
                 pass
 
-            raise last_exc
+            return {
+                "status": "UPSTREAM_UNAVAILABLE",
+                "duration_seconds": duration,
+                "error": str(last_exc),
+            }
 
     # Parse all city-wise and benchmark rates
     payload = parse_kjpl_all_city_rates(html_content, reference_time=now_ist)
