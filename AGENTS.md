@@ -1,32 +1,37 @@
 # AGENTS.md — Agent & Developer Engineering Guidelines
 
-This document establishes the binding engineering principles, operational invariants, and architectural standards for AI agents and human developers contributing to **GoldSense AI**.
+This document establishes the binding engineering principles, operational invariants, and architectural standards for AI agents and human developers contributing to **VMD Bullion** (formerly GoldSense AI).
 
 ---
 
 ## 1. Prime Directives
 
-1. **Absolute Data Integrity & Zero Fabrication**
-   - Never fabricate data, synthesize artificial historical prices, or modify prediction targets/features to inflate model performance metrics.
-   - If historical data contains gaps, holidays, or missing returns, document them transparently or handle them via forward-filling/masking. Never invent values.
-   - When sample counts are below statistical viability thresholds (e.g., $N < 50$ events for ML training), explicitly label the state as `EXPERIMENTAL_DATA_COLLECTION` in the UI and API.
+1. **The Ultimate Aim: Institutional Bullion Intelligence**
+   - VMD Bullion is an institutional, Bloomberg-inspired Indian physical bullion intelligence terminal.
+   - Core coverage: physical cash gold and silver across the 5 primary Indian hubs (Chennai, Bengaluru, Mumbai, Coimbatore, Hyderabad), 1KG 99.99 Pure Gold Bar, and MJDTA benchmarks.
+   - All rate extraction, city comparisons, and terminal displays must serve physical bullion clarity.
 
-2. **Zero Lookahead Bias & Point-in-Time Discipline**
+2. **Absolute Data Integrity & Zero Fabrication**
+   - Never fabricate data, synthesize artificial live or historical prices, or simulate artificial tick volatility.
+   - If historical data contains gaps, holidays, or missing returns, document them transparently or handle them via forward-filling/masking. Never invent values.
+   - When upstream rates are unchanged or markets are closed, reflect `is_changed: false` faithfully.
+
+3. **Zero Lookahead Bias & Point-in-Time Discipline**
    - All machine learning features generated at time $t$ for predicting price at $t + \Delta$ must use strictly information available on or before $t$.
    - Any news sentiment aggregation must enforce an explicit cutoff: $\text{article\_published\_at} \le t$. Articles published after market close or event timestamp must never leak into that day's feature vector.
    - Shifted targets (`next_event_gold`) must be computed by strictly shifting backwards in time relative to feature rows.
 
-3. **No Commercial Selling Workflows**
-   - GoldSense AI is a **personal bullion tracking and market intelligence platform**, not an e-commerce or retail jeweler management software.
+4. **No Commercial Selling Workflows**
+   - VMD Bullion is a **personal bullion tracking and market intelligence platform**, not an e-commerce or retail jeweler management software.
    - **Forbidden features**: Point-of-Sale (POS), shopping carts, checkout, merchant payments, customer management (CRM), supplier accounts, sales invoicing, GST commercial billing, stock dispatch, or shipping tracking.
    - Allowed features: Personal bullion holdings management (gold & silver, weight in grams/kg, purity, acquisition cost, market valuation, unrealized gain/loss).
 
-4. **Multi-User Isolation & Personal Privacy**
+5. **Multi-User Isolation & Personal Privacy**
    - All portfolio holdings, custom alert rules, and user-specific preferences must carry an explicit `user_id`.
    - APIs must enforce tenancy/user isolation via authenticated sessions or the `X-User-ID` header.
    - Market rate data, news sentiment, and machine learning models are shared system assets; personal portfolio records are strictly private.
 
-5. **Non-Destructive Operations & Git Hygiene**
+6. **Non-Destructive Operations & Git Hygiene**
    - All active development must take place on the `develop` branch.
    - **Never run `git push --force`** or rewrite remote branch history.
    - Do not overwrite valid historical rate records in `data/kjpl/` or `data/market/`. Data collection must be strictly additive and append-only.
