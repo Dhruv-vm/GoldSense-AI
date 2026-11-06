@@ -5,6 +5,10 @@ on:
     - cron: '0 * * * *'
   workflow_dispatch:
 
+concurrency:
+  group: market-collector-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -15,6 +19,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -41,7 +47,7 @@ jobs:
           else
             git commit -m "data: collect market rates"
 
-            MAX_RETRIES=4
+            MAX_RETRIES=5
             for attempt in $(seq 1 $MAX_RETRIES); do
               echo "[MARKET WORKFLOW] Push attempt $attempt of $MAX_RETRIES..."
               if git pull --rebase origin develop && git push origin develop; then

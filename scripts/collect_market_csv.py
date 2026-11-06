@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import time
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -21,20 +22,47 @@ SYMBOLS = {
 def get_latest_intraday_close(symbol: str) -> float:
     ticker = yf.Ticker(symbol)
 
-    history = ticker.history(
-        period="2d",
-        interval="15m",
-    )
+    # Attempt 1: 2-day 15-minute intraday close with 3x retry
+    for attempt in range(1, 4):
+        try:
+            history = ticker.history(period="2d", interval="15m")
+            if not history.empty:
+                closes = history["Close"].dropna()
+                if not closes.empty:
+                    return float(closes.iloc[-1])
+        except Exception as e:
+            if attempt == 3:
+                print(f"[MARKET COLLECTOR] Intraday fetch error for {symbol} (attempt {attempt}/3): {e}")
+            time.sleep(2)
 
-    if history.empty:
-        raise RuntimeError(f"No intraday data returned for {symbol}")
+    # Attempt 2: 5-day daily close fallback (crucial for weekends, market holidays, or exchange breaks)
+    try:
+        daily_history = ticker.history(period="5d", interval="1d")
+        if not daily_history.empty:
+            closes = daily_history["Close"].dropna()
+            if not closes.empty:
+                print(f"[MARKET COLLECTOR] Note: Using daily close fallback for {symbol}")
+                return float(closes.iloc[-1])
+    except Exception as e:
+        print(f"[MARKET COLLECTOR] Daily fallback error for {symbol}: {e}")
 
-    closes = history["Close"].dropna()
+    # Attempt 3: Read last-known-good price from CSV if upstream provider is unreachable
+    if OUTPUT.exists():
+        try:
+            with OUTPUT.open("r", encoding="utf-8") as f:
+                rows = list(csv.DictReader(f))
+                if rows:
+                    last_row = rows[-1]
+                    field_map = {"USDINR=X": "usdinr", "GC=F": "xauusd", "SI=F": "xagusd"}
+                    col = field_map.get(symbol)
+                    if col and col in last_row:
+                        val = float(last_row[col])
+                        print(f"[MARKET COLLECTOR] Warning: Using last known good value for {symbol}: {val}")
+                        return val
+        except Exception as csv_err:
+            print(f"[MARKET COLLECTOR] CSV fallback read error: {csv_err}")
 
-    if closes.empty:
-        raise RuntimeError(f"No valid intraday close for {symbol}")
-
-    return float(closes.iloc[-1])
+    raise RuntimeError(f"No valid price data returned for {symbol}")
 
 
 def collect() -> None:
