@@ -123,10 +123,14 @@ GoldSense-AI/
 │   │                               # matrix comparison, import parity, news, vault, data monitor
 ├── scripts/
 │   ├── collect_kjpl_csv.py         # 5-city KJPL collector with 3x retry + SQLite/Supabase persistence
+│   ├── collect_market_csv.py       # Yahoo Finance market collector with intraday/daily/CSV fallbacks
 │   ├── verify_supabase_connection.py # Supabase PostgreSQL diagnostic & verification script
 │   └── validate_pipeline_outputs.py # ML artifact validation
-└── .github/workflows/
-    └── kjpl-collector.yml          # GitHub Actions 5-city automated cloud collector (runs on schedule)
+└── .github/workflows/              # All workflows run on actions/checkout@v7 & setup-python@v7 (Node 24)
+    ├── kjpl-collector.yml          # 5-city KJPL collector (6 India-window crons)
+    ├── market-collector.yml        # Hourly spot/FX collector (staggered at :23 past hour)
+    ├── news-collector.yml          # News collector (03, 09, 15, 21 UTC)
+    └── pipeline-update.yml         # Post-news feature/eval pipeline & artifact validator
 ```
 
 ---
@@ -158,3 +162,20 @@ When ready to connect to production Supabase PostgreSQL:
 1. Set `DATABASE_URL` in environment (or `SUPABASE_DATABASE_URL` in GitHub Secrets).
 2. Run `alembic upgrade head` to apply all migrations.
 3. Run `PYTHONPATH=backend python scripts/verify_supabase_connection.py` to confirm table integrity, seeding, and live transactional write/read-back.
+
+---
+
+## 6. Current Data Status & Invitation for Claude's Input (Updated Nov 10, 2026)
+
+### Live Data Counts on `develop`
+- `data/kjpl/kjpl_rates.csv`: **53 raw rows** (Sep 19 – Nov 10, 2026)
+- `data/kjpl/city_rates.csv`: **133 rows** (`CHENNAI`: 49, `ALL_INDIA`: 40, `BENGALURU`: 11, `MUMBAI`: 11, `COIMBATORE`: 11, `HYDERABAD`: 11)
+- `data/market/market_rates.csv`: **272 rows**
+- `backend/ml/data/processed/evaluation_report.json`: **42 / 50 usable ML events** (`INSUFFICIENT_DATA_FOR_SUPERVISED_TRAINING`, 8 more unique trading events needed before enabling ML inference)
+
+### Where Your Input & Critique Are Welcome
+If you are reviewing this codebase as Claude, feel free to propose concrete improvements on:
+1. **UX & Bloomberg Terminal Density**: Modularizing `frontend/app/page.tsx`, improving mobile ergonomics, and surfacing city arbitrage spreads cleanly.
+2. **Import Parity & MCX Basis Analytics**: Refining landed-cost calculations (BCD/AIDC/GST breakdowns) and MCX futures vs. physical cash basis tracking.
+3. **Production Deployment & Reliability**: Hardening Render/Supabase deployment configs, query indexing, and multi-user vault alert delivery.
+4. **Statistical Threshold Readiness**: Designing the validation gate and baseline comparison strategy once usable ML events reach `>= 50`.
