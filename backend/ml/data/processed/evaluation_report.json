@@ -1,11 +1,11 @@
 {
   "status": "INSUFFICIENT_DATA_FOR_SUPERVISED_TRAINING",
-  "timestamp": "2026-11-09T23:51:32.620080+00:00",
+  "timestamp": "2026-11-10T10:53:08.705507+00:00",
   "dataset_metadata": {
-    "total_events_in_dataset": 45,
-    "usable_complete_rows": 41,
+    "total_events_in_dataset": 46,
+    "usable_complete_rows": 42,
     "min_required_threshold": 50,
-    "remaining_events_needed": 9,
+    "remaining_events_needed": 8,
     "target_variable": "next_event_gold",
     "features_evaluated": [
       "usdinr",
@@ -29,14 +29,14 @@
   "baseline_benchmarks": {
     "naive_persistence": {
       "description": "Predicts next event rate equals current rate (y_hat = current_price)",
-      "mae_inr_per_g": 88.05,
-      "rmse_inr_per_g": 122.12
+      "mae_inr_per_g": 87.02,
+      "rmse_inr_per_g": 120.85
     },
     "sma_3_event": {
       "description": "3-event rolling simple moving average",
-      "mae_inr_per_g": 165.53,
-      "rmse_inr_per_g": 214.69
+      "mae_inr_per_g": 164.33,
+      "rmse_inr_per_g": 212.86
     }
   },
-  "recommendation": "Current sample size (41 events) is below the minimum statistical requirement (50 events). Continue daily genuine data collection. Complex machine learning inference should remain disabled until at least 50 continuous daily trading sessions have been observed."
+  "recommendation": "Current sample size (42 events) is below the minimum statistical requirement (50 events). Continue daily genuine data collection. Complex machine learning inference should remain disabled until at least 50 continuous daily trading sessions have been observed."
 }
