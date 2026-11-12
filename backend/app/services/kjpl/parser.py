@@ -21,13 +21,34 @@ def _extract_number(text: str) -> float | None:
     return float(match.group(0).replace(",", ""))
 
 
+def parse_kjpl_type4_datetime(text: str | None) -> datetime | None:
+    """
+    Parse KJPL Type-4 live feed (`kjpl.txt`) timestamps strictly as US slash-separated
+    MM/DD/YYYY (e.g. '11/12/2026 01:44:14 PM' -> Nov 12, 2026 13:44:14 IST).
+    Never falls back to DD/MM/YYYY to avoid silent month/day swaps.
+    """
+    if not text:
+        return None
+    clean = text.strip().strip('"').strip()
+    for fmt in (
+        "%m/%d/%Y %I:%M:%S %p",
+        "%m/%d/%Y %I:%M %p",
+        "%m/%d/%Y %H:%M:%S",
+    ):
+        try:
+            dt = datetime.strptime(clean, fmt)
+            return dt.replace(tzinfo=IST)
+        except ValueError:
+            continue
+    return None
+
+
 def parse_full_kjpl_datetime(text: str | None) -> datetime | None:
     """
-    Parse explicit KJPL date+time strings such as:
-      - '11-11-2026 09:37:32 am'
-      - '11-11-2026 09:37 am'
-      - '11/11/2026 02:01:59 PM'
-    Returns a timezone-aware datetime in Asia/Kolkata, or None if no full date is present.
+    Parse explicit KJPL MJDTA HTML dash-separated date+time strings strictly as DD-MM-YYYY
+    (e.g. '11-11-2026 09:37:32 am', '11-11-2026 09:37 am').
+    Rejects slash-separated strings when the source contract is not Type-4.
+    Returns a timezone-aware datetime in Asia/Kolkata, or None if invalid/ambiguous.
     """
     if not text:
         return None
@@ -35,8 +56,6 @@ def parse_full_kjpl_datetime(text: str | None) -> datetime | None:
     for fmt in (
         "%d-%m-%Y %I:%M:%S %p",
         "%d-%m-%Y %I:%M %p",
-        "%d/%m/%Y %I:%M:%S %p",
-        "%m/%d/%Y %I:%M:%S %p",
         "%d-%m-%Y %H:%M:%S",
     ):
         try:

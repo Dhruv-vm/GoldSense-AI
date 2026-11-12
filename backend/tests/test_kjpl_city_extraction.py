@@ -289,3 +289,98 @@ def test_legacy_db_metadata_repair_and_collector_execution(isolated_session, tmp
     for c in ("CHENNAI", "BENGALURU", "MUMBAI", "COIMBATORE", "HYDERABAD"):
         row = isolated_session.query(BullionLatestRate).filter_by(city_code=c, product_id="GOLD_100G_999").one()
         assert float(row.normalized_price_per_gram) > 14000.0
+
+
+def test_stage18_source_specific_kjpl_datetime_parsing():
+    """Stage 18: Type-4 slash timestamps are strictly MM/DD/YYYY; MJDTA dash timestamps are strictly DD-MM-YYYY."""
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    from app.services.kjpl.parser import parse_full_kjpl_datetime, parse_kjpl_type4_datetime
+
+    ist = ZoneInfo("Asia/Kolkata")
+
+    dt1 = parse_kjpl_type4_datetime("11/12/2026 01:44:14 PM")
+    assert dt1 == datetime(2026, 11, 12, 13, 44, 14, tzinfo=ist)
+    assert dt1.astimezone(timezone.utc) == datetime(2026, 11, 12, 8, 14, 14, tzinfo=timezone.utc)
+
+    dt2 = parse_kjpl_type4_datetime("11/12/2026 02:18:44 PM")
+    assert dt2 == datetime(2026, 11, 12, 14, 18, 44, tzinfo=ist)
+    assert dt2.astimezone(timezone.utc) == datetime(2026, 11, 12, 8, 48, 44, tzinfo=timezone.utc)
+
+    # Single-digit components
+    dt_single = parse_kjpl_type4_datetime("1/5/2026 09:05:00 AM")
+    assert dt_single == datetime(2026, 1, 5, 9, 5, 0, tzinfo=ist)
+    dt_dash_single = parse_full_kjpl_datetime("5-1-2026 09:05 am")
+    assert dt_dash_single == datetime(2026, 1, 5, 9, 5, 0, tzinfo=ist)
+
+    # MJDTA dash-separated dates
+    dt_mjdta = parse_full_kjpl_datetime("12-11-2026 09:38:00 am")
+    assert dt_mjdta == datetime(2026, 11, 12, 9, 38, 0, tzinfo=ist)
+
+    # Invalid dates & cross-contract rejection
+    assert parse_kjpl_type4_datetime("13/12/2026 01:44:14 PM") is None  # month 13 invalid
+    assert parse_full_kjpl_datetime("32-11-2026 09:30 am") is None
+    assert parse_full_kjpl_datetime("11/12/2026 01:44:14 PM") is None  # ambiguous slash rejected without Type-4 contract
+
+
+def test_stage18_universal_future_and_invalid_timestamp_quarantine(isolated_session):
+    """Stage 18: Future or invalid source timestamps are quarantined across KJPL_LIVE, RETAIL, WHOLESALE, MJDTA_BENCHMARK."""
+    from datetime import datetime, timezone
+    from app.models.bullion import BullionLatestRate, BullionRateObservation
+    from app.services.kjpl.persistence import persist_parsed_payload, seed_bullion_metadata
+
+    seed_bullion_metadata(isolated_session, ensure_schema=False)
+
+    # 1. Future Type-4 timestamp (12/11/2026 when observed_at is 2026-11-12) must be QUARANTINED for 47..52 & KJPL_LIVE
+    future_txt = "\n".join([
+        "3\t47\t-\t-\t14183.30\t-\t-\t-\t-\t-\t12-11-2026",
+        "3\t48\t-\t-\t14166.30\t-\t-\t-\t-\t-\t12-11-2026",
+        "3\t49\t-\t-\t14166.30\t-\t-\t-\t-\t-\t12-11-2026",
+        "3\t50\t-\t-\t14166.30\t-\t-\t-\t-\t-\t12-11-2026",
+        "3\t51\t-\t-\t14166.30\t-\t-\t-\t-\t-\t12-11-2026",
+        "3\t52\t-\t-\t14166.30\t-\t-\t-\t-\t-\t12-11-2026",
+        "2\tGOLDDEC\tGOLD\t137913\t137881\t138500\t137500\t137900\t\t\t-",
+        '4\t4\t-\t1\t0\t\t"12/11/2026 02:18:44 PM"\t-\t-\t-\t-',
+    ])
+    payload_future = parse_kjpl_live_feed(future_txt)
+    payload_future.observed_at = datetime(2026, 11, 12, 8, 48, 51, tzinfo=timezone.utc)
+    res = persist_parsed_payload(payload_future, session=isolated_session, source_key="KJPL_LIVE", mirror_csv=False)
+    assert res["records_quarantined"] == 7
+    assert res["records_inserted"] == 0
+    assert isolated_session.query(BullionLatestRate).count() == 0
+
+    # 2. Invalid/unparseable Type-4 timestamp must never fall back to observed_at
+    bad_ts_txt = "\n".join([
+        "3\t48\t-\t-\t14166.30\t-\t-\t-\t-\t-\t12-11-2026",
+        '4\t4\t-\t1\t0\t\t"13/12/2026 02:18:44 PM"\t-\t-\t-\t-',
+    ])
+    payload_bad = parse_kjpl_live_feed(bad_ts_txt)
+    payload_bad.observed_at = datetime(2026, 11, 12, 8, 50, 0, tzinfo=timezone.utc)
+    assert payload_bad.source_updated_at is None
+    res_bad = persist_parsed_payload(payload_bad, session=isolated_session, source_key="KJPL_LIVE", mirror_csv=False)
+    assert res_bad["records_quarantined"] == 1
+    bad_obs = isolated_session.query(BullionRateObservation).order_by(BullionRateObservation.id.desc()).first()
+    assert bad_obs.validation_status == "QUARANTINED"
+    assert bad_obs.source_published_at is None
+
+    # 3. Valid MJDTA unchanged-price distinct publications & ALL_INDIA isolation
+    from app.services.kjpl.city_parser import parse_kjpl_all_city_rates
+    from app.services.prediction.mjdta_series import load_mjdta_observations_from_db
+
+    for day in ("11-11-2026", "12-11-2026"):
+        html = f"""
+        <html><body>
+          <table class="chennairate_table">
+            <tr><td>MJDTA RATE (Without GST)</td></tr>
+            <tr><td>GOLD:</td><td>(₹) 12815</td></tr>
+            <tr><td>SILVER:</td><td>(₹) 200</td></tr>
+            <tr><td>UPDATED:</td><td>{day} 09:38:00 am</td></tr>
+          </table>
+        </body></html>
+        """
+        p = parse_kjpl_all_city_rates(html, reference_time=datetime(2026, 11, 12, 10, 0, tzinfo=timezone.utc))
+        persist_parsed_payload(p, session=isolated_session, source_key="KJPL_MJDTA", mirror_csv=False)
+
+    obs_list, _ = load_mjdta_observations_from_db(isolated_session)
+    assert len(obs_list) == 2
+    assert all(pt.gold_mjdta_inr_per_g == 12815.0 for pt in obs_list)

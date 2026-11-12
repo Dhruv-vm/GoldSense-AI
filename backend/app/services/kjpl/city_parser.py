@@ -11,6 +11,7 @@ from app.services.kjpl.city_schemas import ParsedCityRate, ParsedKJPLPayload
 from app.services.kjpl.parser import (
     _extract_mjdta_tables,
     parse_full_kjpl_datetime,
+    parse_kjpl_type4_datetime,
     resolve_clock_only_kjpl_time,
     resolve_clock_only_kjpl_timestamp,
 )
@@ -434,7 +435,7 @@ def parse_kjpl_live_feed(
                 ts_raw = fields[6].strip().strip('"') if len(fields) > 6 else ""
                 if ts_raw:
                     source_updated_time = ts_raw
-                    source_updated_at = parse_full_kjpl_datetime(ts_raw)
+                    source_updated_at = parse_kjpl_type4_datetime(ts_raw)
             rate_display_enabled = (rd == "1")
             market_status = "CLOSED" if ms == "1" else "OPEN"
 
@@ -443,7 +444,12 @@ def parse_kjpl_live_feed(
         rp_ts = rpanel_json["rpaneldata"].get("lastupdatetime")
         if rp_ts:
             source_updated_time = str(rp_ts)
-            source_updated_at = parse_full_kjpl_datetime(str(rp_ts))
+            rp_str = str(rp_ts)
+            source_updated_at = (
+                parse_kjpl_type4_datetime(rp_str)
+                if "/" in rp_str
+                else parse_full_kjpl_datetime(rp_str)
+            )
 
     return ParsedKJPLPayload(
         observed_at=now,

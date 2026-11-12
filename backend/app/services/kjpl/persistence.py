@@ -354,7 +354,30 @@ def persist_parsed_payload(
                 previous_valid_per_gram=prev_norm_per_gram,
             )
 
-            if outcome.validation_status in ("QUARANTINED", "INVALIDATED"):
+            # Universal future-publication & malformed-source-timestamp guard (Stage 18):
+            # Applies to ALL non-MJDTA categories (KJPL_LIVE, RETAIL, WHOLESALE, LBMA_FIX, etc.).
+            ts_quarantine_reason: str | None = None
+            if source_pub_utc is not None and source_pub_utc > now_utc + MJDTA_FUTURE_TOLERANCE:
+                ts_quarantine_reason = (
+                    f"Future source_published_at ({source_pub_utc.isoformat()}) "
+                    f"exceeds observed_at ({now_utc.isoformat()})"
+                )
+            elif raw_src_time and source_pub_utc is None and (
+                source_key in ("KJPL_LIVE", "KJPL_LIVE_WS")
+                or payload.pipeline in ("KJPL_LIVE", "KJPL_LIVE_WS", "KJPL_TXT")
+            ):
+                ts_quarantine_reason = (
+                    f"Invalid or ambiguous KJPL Type-4 source timestamp ({raw_src_time}); "
+                    f"refusing fallback to observed_at"
+                )
+
+            if outcome.validation_status in ("QUARANTINED", "INVALIDATED") or ts_quarantine_reason is not None:
+                eff_status = (
+                    outcome.validation_status
+                    if outcome.validation_status in ("QUARANTINED", "INVALIDATED")
+                    else "QUARANTINED"
+                )
+                eff_reason = outcome.reason or ts_quarantine_reason or "Validation rejected"
                 quarantined_count += 1
                 item_logs.append({
                     "source_product_id": rate.source_product_id or rate.product_id,
@@ -364,8 +387,8 @@ def persist_parsed_payload(
                     "raw_unit": rate.unit,
                     "normalized_value": outcome.normalized_price_per_gram,
                     "normalized_unit": "INR/g" if rate.currency == "INR" else f"{rate.currency}/{rate.unit}",
-                    "validation_status": outcome.validation_status,
-                    "persistence_result": f"QUARANTINED: {outcome.reason or 'Validation rejected'}",
+                    "validation_status": eff_status,
+                    "persistence_result": f"QUARANTINED: {eff_reason}",
                 })
                 session.add(BullionRateObservation(
                     city_code=rate.city_code,
@@ -384,11 +407,16 @@ def persist_parsed_payload(
                     normalized_price_per_gram=_to_dec(outcome.normalized_price_per_gram),
                     source_url=source_url,
                     source_published_at=source_pub_utc,
+                    raw_source_published_time=raw_src_time,
+                    source_timestamp_precision=prec_mode or ("FULL" if source_pub_utc is not None else "MISSING"),
+                    is_timestamp_inferred=bool(getattr(payload, "is_timestamp_inferred", False)),
                     observed_at=now_utc,
+                    observation_kind="ORIGINAL",
+                    revision_number=1,
                     is_changed=False,
                     freshness_status="QUARANTINED",
-                    validation_status=outcome.validation_status,
-                    quarantine_reason=outcome.reason,
+                    validation_status=eff_status,
+                    quarantine_reason=eff_reason,
                     raw_payload_reference=rate.raw_payload_reference,
                 ))
                 continue
