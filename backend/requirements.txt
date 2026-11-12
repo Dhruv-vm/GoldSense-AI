@@ -48,4 +48,3 @@ urllib3==2.8.0
 uvicorn==0.53.0
 websockets==17.1
 xgboost==3.4.1
-yfinance==1.7.0

@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: vmd_user
+      POSTGRES_PASSWORD: vmd_dev_password
+      POSTGRES_DB: vmd_bullion
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vmd_user -d vmd_bullion"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    image: python:3.12-slim
+    working_dir: /app/backend
+    volumes:
+      - .:/app
+    environment:
+      DATABASE_URL: postgresql+psycopg://vmd_user:vmd_dev_password@postgres:5432/vmd_bullion
+      ENVIRONMENT: development
+      ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      PYTHONPATH: /app/backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "pip install --no-cache-dir -r requirements-api.txt &&
+             alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  kjpl-worker:
+    image: python:3.12-slim
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      DATABASE_URL: postgresql+psycopg://vmd_user:vmd_dev_password@postgres:5432/vmd_bullion
+      ENVIRONMENT: development
+      PYTHONPATH: /app/backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "pip install --no-cache-dir -r backend/requirements-worker.txt &&
+             python scripts/kjpl_live_worker.py"
+
+volumes:
+  pgdata:

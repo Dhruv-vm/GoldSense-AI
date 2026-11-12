@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, Float, Integer, String, Text
+from decimal import Decimal
+from sqlalchemy import DateTime, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -15,13 +16,13 @@ class PortfolioHolding(Base):
 
     metal_type: Mapped[str] = mapped_column(String(20), nullable=False)  # "GOLD" or "SILVER"
     product_name: Mapped[str] = mapped_column(String(150), nullable=False)
-    purity: Mapped[float] = mapped_column(Float, nullable=False, default=0.999)
-    gross_weight_grams: Mapped[float] = mapped_column(Float, nullable=False)
-    fine_weight_grams: Mapped[float] = mapped_column(Float, nullable=False)
+    purity: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False, default=Decimal("0.9990"))
+    gross_weight_grams: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    fine_weight_grams: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
     acquisition_date: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    acquisition_cost_inr: Mapped[float | None] = mapped_column(Float, nullable=True)
+    acquisition_cost_inr: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

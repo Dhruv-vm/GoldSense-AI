@@ -8,42 +8,47 @@ from zoneinfo import ZoneInfo
 from bs4 import BeautifulSoup
 
 from app.services.kjpl.city_schemas import ParsedCityRate, ParsedKJPLPayload
+from app.services.kjpl.parser import (
+    _extract_mjdta_tables,
+    parse_full_kjpl_datetime,
+    resolve_clock_only_kjpl_time,
+    resolve_clock_only_kjpl_timestamp,
+)
+from app.services.kjpl.validator import validate_bullion_observation, resolve_weight_grams
 
 IST = ZoneInfo("Asia/Kolkata")
 
-# Canonical 5 Mandatory Cities Mapping
 CITY_MAPPINGS: dict[str, tuple[str, str]] = {
-    # key (normalized lowercase pattern) -> (canonical_city_code, display_name)
     "chennai": ("CHENNAI", "Chennai"),
-    "bangalore": ("BENGALURU", "Bengaluru"),  # Strictly normalize Bangalore to Bengaluru
+    "bangalore": ("BENGALURU", "Bengaluru"),
     "bengaluru": ("BENGALURU", "Bengaluru"),
     "mumbai": ("MUMBAI", "Mumbai"),
     "coimbatore": ("COIMBATORE", "Coimbatore"),
     "hyderabad": ("HYDERABAD", "Hyderabad"),
 }
 
-# Known Commodity ID map from KJPL live engine
-KNOWN_COM_ID_MAP: dict[str, dict[str, Any]] = {
+# Verified KJPL commodity metadata (verified 2026-11-11 via get_rpanel_data + kjpl.txt + ws://www.kjpl.in/ws)
+LIVE_TYPE3_COM_ID_MAP: dict[str, dict[str, Any]] = {
     "47": {
         "city_code": "ALL_INDIA",
         "city_display_name": "National",
         "product_id": "GOLD_1KG_9999",
-        "product_name": "Gold 1KG 99.99 Pure Bar",
+        "product_name": "GOLD 1KG 99.99",
         "metal": "GOLD",
         "purity": 0.9999,
         "weight": 1.0,
-        "unit": "1kg",
+        "unit": "1g",  # Live feed com_weight=1.000 quotes INR/1g
         "rate_type": "WHOLESALE",
     },
     "48": {
         "city_code": "CHENNAI",
         "city_display_name": "Chennai",
         "product_id": "GOLD_100G_999",
-        "product_name": "Gold 100 GMS 999 Chennai",
+        "product_name": "GOLD 100 GMS 999 Chennai",
         "metal": "GOLD",
         "purity": 0.999,
-        "weight": 100.0,
-        "unit": "100g",
+        "weight": 1.0,
+        "unit": "1g",
         "rate_type": "RETAIL",
     },
     "49": {
@@ -53,8 +58,8 @@ KNOWN_COM_ID_MAP: dict[str, dict[str, Any]] = {
         "product_name": "Gold 100 GMS 999 Bengaluru",
         "metal": "GOLD",
         "purity": 0.999,
-        "weight": 100.0,
-        "unit": "100g",
+        "weight": 1.0,
+        "unit": "1g",
         "rate_type": "RETAIL",
     },
     "50": {
@@ -64,8 +69,8 @@ KNOWN_COM_ID_MAP: dict[str, dict[str, Any]] = {
         "product_name": "Gold 100 GMS 999 Mumbai",
         "metal": "GOLD",
         "purity": 0.999,
-        "weight": 100.0,
-        "unit": "100g",
+        "weight": 1.0,
+        "unit": "1g",
         "rate_type": "RETAIL",
     },
     "51": {
@@ -75,41 +80,19 @@ KNOWN_COM_ID_MAP: dict[str, dict[str, Any]] = {
         "product_name": "Gold 100 GMS 999 Coimbatore",
         "metal": "GOLD",
         "purity": 0.999,
-        "weight": 100.0,
-        "unit": "100g",
+        "weight": 1.0,
+        "unit": "1g",
         "rate_type": "RETAIL",
     },
     "52": {
         "city_code": "HYDERABAD",
         "city_display_name": "Hyderabad",
         "product_id": "GOLD_100G_999",
-        "product_name": "Gold 100 GMS 999 Hyderabad",
+        "product_name": "GOLD 100 GMS 999 Hyderabad",
         "metal": "GOLD",
-        "purity": 0.999,
-        "weight": 100.0,
-        "unit": "100g",
-        "rate_type": "RETAIL",
-    },
-    "2": {
-        "city_code": "ALL_INDIA",
-        "city_display_name": "National",
-        "product_id": "MJDTA_SILVER",
-        "product_name": "Spot Silver Benchmark",
-        "metal": "SILVER",
         "purity": 0.999,
         "weight": 1.0,
         "unit": "1g",
-        "rate_type": "MJDTA_BENCHMARK",
-    },
-    "12": {
-        "city_code": "CHENNAI",
-        "city_display_name": "Chennai",
-        "product_id": "SILVER_1KG_999",
-        "product_name": "Silver 1KG 999 Chennai",
-        "metal": "SILVER",
-        "purity": 0.999,
-        "weight": 1.0,
-        "unit": "1kg",
         "rate_type": "RETAIL",
     },
 }
@@ -119,49 +102,51 @@ def _extract_number(text: str | None) -> float | None:
     if not text:
         return None
     clean = text.replace(",", "").strip()
-    match = re.search(r"\d+(?:\.\d+)?", clean)
+    if clean in ("-", "--", ""):
+        return None
+    match = re.search(r"-?\d+(?:\.\d+)?", clean)
     if not match:
         return None
     val = float(match.group(0))
     return val if val > 0 else None
 
 
-def _parse_source_clock_time(time_str: str | None, now_ist: datetime) -> datetime | None:
+def _parse_source_clock_time(
+    time_str: str | None,
+    now_ist: datetime,
+    full_updated_text: str | None = None,
+) -> datetime | None:
+    if full_updated_text:
+        full_dt = parse_full_kjpl_datetime(full_updated_text)
+        if full_dt is not None:
+            return full_dt
     if not time_str:
         return None
-    match = re.search(r"(\d{1,2}):(\d{2})\s*(am|pm)", time_str, re.IGNORECASE)
-    if not match:
-        return None
-    hour = int(match.group(1))
-    minute = int(match.group(2))
-    meridiem = match.group(3).lower()
-    if meridiem == "pm" and hour != 12:
-        hour += 12
-    elif meridiem == "am" and hour == 12:
-        hour = 0
-    return datetime(
-        year=now_ist.year,
-        month=now_ist.month,
-        day=now_ist.day,
-        hour=hour,
-        minute=minute,
-        tzinfo=IST,
-    )
+    full_inline = parse_full_kjpl_datetime(time_str)
+    if full_inline is not None:
+        return full_inline
+    return resolve_clock_only_kjpl_time(time_str, now_ist)
 
 
-def _resolve_city_and_product(name: str, com_id: str | None = None) -> dict[str, Any]:
+def _resolve_city_and_product(name: str, com_id: str | None = None, price_hint: float | None = None) -> dict[str, Any]:
     """
-    Given a raw product string (and optional com_id), deduce city, product_id, metal,
-    purity, weight, unit, and rate_type.
+    Resolve metadata from com_id / product name.
+    Detects whether IDs 47..52 are quoted in per-1g live scale (<100,000) vs total bar price (>=500,000).
     """
-    if com_id and com_id in KNOWN_COM_ID_MAP:
-        meta = dict(KNOWN_COM_ID_MAP[com_id])
+    if com_id and com_id in LIVE_TYPE3_COM_ID_MAP:
+        meta = dict(LIVE_TYPE3_COM_ID_MAP[com_id])
+        if price_hint is not None and price_hint >= 500_000:
+            if com_id == "47":
+                meta["weight"] = 1.0
+                meta["unit"] = "1kg"
+            else:
+                meta["weight"] = 100.0
+                meta["unit"] = "100g"
         return meta
 
     upper_name = name.upper()
     metal = "SILVER" if "SILVER" in upper_name else "GOLD"
 
-    # Identify city
     city_code = "ALL_INDIA"
     city_display = "National"
     for k, (code, display) in CITY_MAPPINGS.items():
@@ -170,18 +155,21 @@ def _resolve_city_and_product(name: str, com_id: str | None = None) -> dict[str,
             city_display = display
             break
 
-    # Identify purity & weight
     if "1KG" in upper_name or "1 KG" in upper_name or "1000" in upper_name:
-        weight = 1.0
-        unit = "1kg"
         purity = 0.9999 if "99.99" in upper_name or "9999" in upper_name else 0.999
         product_id = f"{metal}_1KG_9999" if purity == 0.9999 else f"{metal}_1KG_999"
-        rate_type = "WHOLESALE"
+        if price_hint is not None and price_hint < 100_000 and metal == "GOLD":
+            weight, unit = 1.0, "1g"
+        else:
+            weight, unit = 1.0, "1kg"
+        rate_type = "WHOLESALE" if metal == "GOLD" else "RETAIL"
     elif "100" in upper_name:
-        weight = 100.0
-        unit = "100g"
         purity = 0.999
         product_id = f"{metal}_100G_999"
+        if price_hint is not None and price_hint < 100_000 and metal == "GOLD":
+            weight, unit = 1.0, "1g"
+        else:
+            weight, unit = 100.0, "100g"
         rate_type = "RETAIL"
     else:
         weight = 1.0
@@ -203,14 +191,353 @@ def _resolve_city_and_product(name: str, com_id: str | None = None) -> dict[str,
     }
 
 
+def _build_validated_item(
+    *,
+    city_code: str,
+    city_display_name: str,
+    product_id: str,
+    product_name: str,
+    metal: str,
+    purity: float,
+    weight: float,
+    unit: str,
+    rate_type: str,
+    price: float,
+    currency: str = "INR",
+    buy_price: float | None = None,
+    high_price: float | None = None,
+    low_price: float | None = None,
+    source_product_id: str | None = None,
+    raw_source_name: str | None = None,
+    diff_rate: float | None = None,
+    raw_payload_reference: str | None = None,
+) -> ParsedCityRate:
+    outcome = validate_bullion_observation(
+        product_id=product_id,
+        metal=metal,
+        currency=currency,
+        unit=unit,
+        weight_value=weight,
+        price=price,
+        source_product_id=source_product_id,
+    )
+    return ParsedCityRate(
+        city_code=city_code,
+        city_display_name=city_display_name,
+        product_id=product_id,
+        product_name=product_name,
+        metal=metal,
+        purity=purity,
+        weight=weight,
+        unit=unit,
+        product_weight_grams=outcome.product_weight_grams,
+        rate_type=rate_type,
+        price=price,
+        buy_price=buy_price,
+        high_price=high_price,
+        low_price=low_price,
+        normalized_price_per_gram=outcome.normalized_price_per_gram,
+        currency=currency,
+        source_product_id=source_product_id,
+        raw_source_name=raw_source_name,
+        diff_rate=diff_rate,
+        validation_status=outcome.validation_status,
+        quarantine_reason=outcome.reason,
+        raw_payload_reference=raw_payload_reference,
+    )
+
+
+def parse_kjpl_live_feed(
+    raw_text: str,
+    rpanel_json: dict[str, Any] | None = None,
+    reference_time: datetime | None = None,
+    source_label: str = "KJPL_LIVE_TXT",
+) -> ParsedKJPLPayload:
+    """
+    Parse KJPL's verified live WebSocket (pipe-delimited) or kjpl.txt (tab-delimited) payload
+    alongside optional C_booking/get_rpanel_data JSON metadata.
+    """
+    now = reference_time or datetime.now(IST)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=IST)
+
+    valid_items: list[ParsedCityRate] = []
+    quarantined_items: list[ParsedCityRate] = []
+    errors: list[str] = []
+
+    rpanel_comms: dict[str, dict[str, Any]] = {}
+    if rpanel_json and isinstance(rpanel_json.get("commoditydetails"), list):
+        for c in rpanel_json["commoditydetails"]:
+            cid = str(c.get("com_id", "")).strip()
+            if cid:
+                rpanel_comms[cid] = c
+
+    source_updated_at: datetime | None = None
+    source_updated_time: str | None = None
+    market_status: str | None = None
+    rate_display_enabled: bool | None = None
+
+    type1_map = {
+        "G": ("KJPL_SPOT_GOLD_USD", "KJPL Spot Gold ($)", "GOLD", "oz", "USD"),
+        "SPOT-GOLD": ("KJPL_SPOT_GOLD_USD", "KJPL Spot Gold ($)", "GOLD", "oz", "USD"),
+        "S": ("KJPL_SPOT_SILVER_USD", "KJPL Spot Silver ($)", "SILVER", "oz", "USD"),
+        "SPOT-SILVER": ("KJPL_SPOT_SILVER_USD", "KJPL Spot Silver ($)", "SILVER", "oz", "USD"),
+        "I": ("KJPL_SPOT_USDINR", "KJPL Spot USD/INR", "FX", "USD", "INR"),
+        "SPOT-INR": ("KJPL_SPOT_USDINR", "KJPL Spot USD/INR", "FX", "USD", "INR"),
+    }
+    type2_map = {
+        "GOLD": ("KJPL_GOLDDEC_INR_10G", "KJPL Gold Contract (10g)", "GOLD", 10.0, "10g"),
+        "GOLDDEC": ("KJPL_GOLDDEC_INR_10G", "KJPL Gold Contract (10g)", "GOLD", 10.0, "10g"),
+        "SILVER": ("KJPL_SILVERDEC_INR_1KG", "KJPL Silver Contract (1kg)", "SILVER", 1.0, "1kg"),
+        "SILVERDEC": ("KJPL_SILVERDEC_INR_1KG", "KJPL Silver Contract (1kg)", "SILVER", 1.0, "1kg"),
+    }
+
+    for raw_line in raw_text.splitlines():
+        line = raw_line.strip()
+        if not line or line in ("R", "ping", "pong"):
+            continue
+
+        is_pipe = "|" in line and "\t" not in line
+        fields = line.split("|") if is_pipe else line.split("\t")
+        if len(fields) < 3:
+            continue
+
+        rec_type = fields[0].strip()
+
+        if rec_type == "3":
+            com_id = fields[1].strip()
+            # Pipe WS: 3|com_id|buy|sell ; Tab kjpl.txt: 3\tcom_id\t-\tbuy\tsell\t...\tdate
+            buy_raw = fields[2] if is_pipe else (fields[3] if len(fields) > 3 else "-")
+            sell_raw = fields[3] if is_pipe else (fields[4] if len(fields) > 4 else "-")
+            sell_val = _extract_number(sell_raw)
+            buy_val = _extract_number(buy_raw)
+
+            meta = LIVE_TYPE3_COM_ID_MAP.get(com_id)
+            if not meta:
+                continue
+
+            if sell_val is None:
+                continue
+
+            comm_meta = rpanel_comms.get(com_id, {})
+            diff_val = _extract_number(str(comm_meta.get("sell_diff", ""))) if comm_meta else None
+            raw_name = str(comm_meta.get("com_name") or meta["product_name"])
+
+            item = _build_validated_item(
+                city_code=meta["city_code"],
+                city_display_name=meta["city_display_name"],
+                product_id=meta["product_id"],
+                product_name=meta["product_name"],
+                metal=meta["metal"],
+                purity=meta["purity"],
+                weight=meta["weight"],
+                unit=meta["unit"],
+                rate_type=meta["rate_type"],
+                price=sell_val,
+                currency="INR",
+                buy_price=buy_val,
+                source_product_id=com_id,
+                raw_source_name=raw_name,
+                diff_rate=diff_val,
+                raw_payload_reference=line[:240],
+            )
+            if item.validation_status == "QUARANTINED":
+                quarantined_items.append(item)
+            else:
+                valid_items.append(item)
+
+        elif rec_type == "1":
+            sym = fields[1].strip().upper()
+            spec = type1_map.get(sym)
+            if not spec:
+                continue
+            pid, pname, metal, unit, currency = spec
+            if is_pipe:
+                bid = _extract_number(fields[2] if len(fields) > 2 else None)
+                ask = _extract_number(fields[3] if len(fields) > 3 else None)
+                high = _extract_number(fields[4] if len(fields) > 4 else None)
+                low = _extract_number(fields[5] if len(fields) > 5 else None)
+            else:
+                bid = _extract_number(fields[3] if len(fields) > 3 else None)
+                ask = _extract_number(fields[4] if len(fields) > 4 else None)
+                high = _extract_number(fields[5] if len(fields) > 5 else None)
+                low = _extract_number(fields[6] if len(fields) > 6 else None)
+            if ask is None and bid is None:
+                continue
+            item = _build_validated_item(
+                city_code="ALL_INDIA",
+                city_display_name="National",
+                product_id=pid,
+                product_name=pname,
+                metal=metal,
+                purity=0.999 if metal != "FX" else 1.0,
+                weight=1.0,
+                unit=unit,
+                rate_type="KJPL_LIVE",
+                price=ask if ask is not None else bid,
+                buy_price=bid,
+                high_price=high,
+                low_price=low,
+                currency=currency,
+                source_product_id=sym,
+                raw_source_name=sym,
+                raw_payload_reference=line[:240],
+            )
+            if item.validation_status == "QUARANTINED":
+                quarantined_items.append(item)
+            else:
+                valid_items.append(item)
+
+        elif rec_type == "2":
+            sym = fields[1].strip().upper()
+            spec = type2_map.get(sym)
+            if not spec:
+                continue
+            pid, pname, metal, wval, unit = spec
+            bid = _extract_number(fields[2] if is_pipe and len(fields) > 2 else (fields[3] if len(fields) > 3 else None))
+            ask = _extract_number(fields[3] if is_pipe and len(fields) > 3 else (fields[4] if len(fields) > 4 else None))
+            high = _extract_number(fields[4] if is_pipe and len(fields) > 4 else (fields[5] if len(fields) > 5 else None))
+            low = _extract_number(fields[5] if is_pipe and len(fields) > 5 else (fields[6] if len(fields) > 6 else None))
+            if ask is None and bid is None:
+                continue
+            item = _build_validated_item(
+                city_code="ALL_INDIA",
+                city_display_name="National",
+                product_id=pid,
+                product_name=pname,
+                metal=metal,
+                purity=0.995 if metal == "GOLD" else 0.999,
+                weight=wval,
+                unit=unit,
+                rate_type="KJPL_LIVE",
+                price=ask if ask is not None else bid,
+                buy_price=bid,
+                high_price=high,
+                low_price=low,
+                currency="INR",
+                source_product_id=sym,
+                raw_source_name=sym,
+                raw_payload_reference=line[:240],
+            )
+            if item.validation_status == "QUARANTINED":
+                quarantined_items.append(item)
+            else:
+                valid_items.append(item)
+
+        elif rec_type == "4":
+            if is_pipe:
+                rd = fields[2].strip() if len(fields) > 2 else "1"
+                ms = fields[3].strip() if len(fields) > 3 else "0"
+            else:
+                rd = fields[3].strip() if len(fields) > 3 else "1"
+                ms = fields[4].strip() if len(fields) > 4 else "0"
+                ts_raw = fields[6].strip().strip('"') if len(fields) > 6 else ""
+                if ts_raw:
+                    source_updated_time = ts_raw
+                    source_updated_at = parse_full_kjpl_datetime(ts_raw)
+            rate_display_enabled = (rd == "1")
+            market_status = "CLOSED" if ms == "1" else "OPEN"
+
+    # Fallback timestamp from rpaneldata if Type 4 didn't provide timestamp (e.g., WS frame)
+    if source_updated_at is None and rpanel_json and isinstance(rpanel_json.get("rpaneldata"), dict):
+        rp_ts = rpanel_json["rpaneldata"].get("lastupdatetime")
+        if rp_ts:
+            source_updated_time = str(rp_ts)
+            source_updated_at = parse_full_kjpl_datetime(str(rp_ts))
+
+    return ParsedKJPLPayload(
+        observed_at=now,
+        pipeline=source_label,
+        source_updated_time=source_updated_time,
+        source_updated_at=source_updated_at,
+        source_timestamp_precision="FULL" if source_updated_at is not None else None,
+        market_status=market_status,
+        rate_display_enabled=rate_display_enabled,
+        city_rates=valid_items,
+        quarantined_rates=quarantined_items,
+        raw_products_count=len(valid_items),
+        extraction_errors=errors,
+    )
+
+
+def _extract_lbma_london_fixes(soup: BeautifulSoup) -> list[ParsedCityRate]:
+    """
+    Extract LBMA AM/PM fixes strictly as USD/oz LBMA_FIX records.
+    Never mixes USD/oz values into domestic INR/g MJDTA products.
+    """
+    fixes: list[ParsedCityRate] = []
+    seen_ids: set[str] = set()
+    for table in soup.find_all("table", class_="chennairate_table"):
+        txt_upper = table.get_text(" ", strip=True).upper()
+        if "LBMA LONDON" not in txt_upper:
+            continue
+        for row in table.find_all("tr"):
+            cells = [c.get_text(" ", strip=True) for c in row.find_all(["td", "th"])]
+            if len(cells) < 2:
+                continue
+            label = cells[0].upper()
+            val = _extract_number(cells[1])
+            if val is None:
+                continue
+            if "GOLD AM" in label and "LBMA_GOLD_AM_USD" not in seen_ids:
+                seen_ids.add("LBMA_GOLD_AM_USD")
+                fixes.append(_build_validated_item(
+                    city_code="ALL_INDIA",
+                    city_display_name="National",
+                    product_id="LBMA_GOLD_AM_USD",
+                    product_name="LBMA London Gold AM Fix",
+                    metal="GOLD",
+                    purity=0.995,
+                    weight=1.0,
+                    unit="oz",
+                    rate_type="LBMA_FIX",
+                    price=val,
+                    currency="USD",
+                    raw_source_name=cells[0],
+                    raw_payload_reference=" | ".join(cells),
+                ))
+            elif "GOLD PM" in label and "LBMA_GOLD_PM_USD" not in seen_ids:
+                seen_ids.add("LBMA_GOLD_PM_USD")
+                fixes.append(_build_validated_item(
+                    city_code="ALL_INDIA",
+                    city_display_name="National",
+                    product_id="LBMA_GOLD_PM_USD",
+                    product_name="LBMA London Gold PM Fix",
+                    metal="GOLD",
+                    purity=0.995,
+                    weight=1.0,
+                    unit="oz",
+                    rate_type="LBMA_FIX",
+                    price=val,
+                    currency="USD",
+                    raw_source_name=cells[0],
+                    raw_payload_reference=" | ".join(cells),
+                ))
+            elif "SILVER" in label and "LBMA_SILVER_USD" not in seen_ids:
+                seen_ids.add("LBMA_SILVER_USD")
+                fixes.append(_build_validated_item(
+                    city_code="ALL_INDIA",
+                    city_display_name="National",
+                    product_id="LBMA_SILVER_USD",
+                    product_name="LBMA London Silver Fix",
+                    metal="SILVER",
+                    purity=0.999,
+                    weight=1.0,
+                    unit="oz",
+                    rate_type="LBMA_FIX",
+                    price=val,
+                    currency="USD",
+                    raw_source_name=cells[0],
+                    raw_payload_reference=" | ".join(cells),
+                ))
+    return fixes
+
+
 def parse_kjpl_all_city_rates(html_content: str, reference_time: datetime | None = None) -> ParsedKJPLPayload:
     """
-    Comprehensive parsing engine for KJPL Bullion.
-    Extracts:
-      1. Benchmark MJDTA Gold & Silver (without GST and with GST).
-      2. Product rows from HTML tables.
-      3. Embedded JSON payloads / script tags (JSON data feed).
-      4. City-specific products for Chennai, Bengaluru, Mumbai, Coimbatore, Hyderabad.
+    Clean HTML parser for KJPL MJDTA reference rates, LBMA USD/oz benchmarks, and
+    explicit structured commodity JSON/DOM tables.
+    Strictly rejects ambiguous fallback table rows that caused ₹100 / ₹51 / USD-as-INR corruptions.
     """
     now = reference_time or datetime.now(IST)
     if now.tzinfo is None:
@@ -219,60 +546,66 @@ def parse_kjpl_all_city_rates(html_content: str, reference_time: datetime | None
     soup = BeautifulSoup(html_content, "html.parser")
     errors: list[str] = []
 
-    # 1. Benchmark Rates from .gold-rate, .silver-rate, .mjdma_data
+    mjdta_tables = _extract_mjdta_tables(soup)
     gold_elem = soup.select_one(".gold-rate")
     silver_elem = soup.select_one(".silver-rate")
     time_elem = soup.select_one(".mjdma_data")
 
-    mjdta_gold = _extract_number(gold_elem.get_text(strip=True)) if gold_elem else None
-    mjdta_silver = _extract_number(silver_elem.get_text(strip=True)) if silver_elem else None
-    source_clock_time = time_elem.get_text(" ", strip=True) if time_elem else None
-    source_published_at = _parse_source_clock_time(source_clock_time, now)
+    mjdta_gold = _extract_number(gold_elem.get_text(strip=True)) if gold_elem else mjdta_tables.get("gold_no_gst")
+    mjdta_silver = _extract_number(silver_elem.get_text(strip=True)) if silver_elem else mjdta_tables.get("silver_no_gst")
+    source_clock_time = time_elem.get_text(" ", strip=True) if time_elem else (
+        str(mjdta_tables["updated_full"]) if mjdta_tables.get("updated_full") else None
+    )
+    full_updated_text = str(mjdta_tables["updated_full"]) if mjdta_tables.get("updated_full") else None
+    source_published_at = _parse_source_clock_time(
+        source_clock_time,
+        now,
+        full_updated_text=full_updated_text,
+    )
+    if parse_full_kjpl_datetime(full_updated_text) or parse_full_kjpl_datetime(source_clock_time):
+        source_timestamp_precision = "FULL"
+    elif source_clock_time:
+        clk_res = resolve_clock_only_kjpl_timestamp(source_clock_time, now)
+        if clk_res.timestamp_ist is not None:
+            source_timestamp_precision = "CLOCK_ONLY"
+        elif clk_res.precision_status == "AMBIGUOUS_CLOCK_ONLY":
+            source_timestamp_precision = "AMBIGUOUS_CLOCK_ONLY"
+        else:
+            source_timestamp_precision = None
+    else:
+        source_timestamp_precision = None
 
-    # 2. Check MJDTA with GST Table
-    mjdta_gold_with_gst = None
-    mjdta_silver_with_gst = None
-    for strong in soup.find_all("strong"):
-        text = strong.get_text(strip=True).upper()
-        if "MJDTA RATE (WITH GST)" in text:
-            table = strong.find_parent("table")
-            if table:
-                for row in table.find_all("tr"):
-                    cells = [c.get_text(strip=True) for c in row.find_all(["td", "th"])]
-                    row_str = " ".join(cells).upper()
-                    if "GOLD" in row_str:
-                        val = _extract_number(row_str)
-                        if val and val > 1000:
-                            mjdta_gold_with_gst = val
-                    elif "SILVER" in row_str:
-                        val = _extract_number(row_str)
-                        if val:
-                            mjdta_silver_with_gst = val
+    g_gst_raw = mjdta_tables.get("gold_with_gst")
+    s_gst_raw = mjdta_tables.get("silver_with_gst")
+    mjdta_gold_with_gst = float(g_gst_raw) if isinstance(g_gst_raw, (int, float)) else None
+    mjdta_silver_with_gst = float(s_gst_raw) if isinstance(s_gst_raw, (int, float)) else None
 
     city_rates_dict: dict[tuple[str, str], ParsedCityRate] = {}
+    quarantined_list: list[ParsedCityRate] = []
 
-    # 3. Strategy A: Embedded JSON in <script> or JSON tags
+    def _register(item: ParsedCityRate) -> None:
+        if item.validation_status == "QUARANTINED":
+            quarantined_list.append(item)
+            return
+        city_rates_dict[(item.city_code, item.product_id)] = item
+
+    # 1. Explicit embedded JSON (<script id="commodity-data"> or explicit com_name JSON arrays)
     for script in soup.find_all("script"):
         content = script.string or ""
-        if "com_name" in content or "sellrate" in content:
-            # Try parsing direct JSON or regex matching JSON arrays
+        if "com_name" in content and "sellrate" in content:
             json_matches = re.findall(r"\[\s*\{.*?\"com_name\".*?\}\s*\]", content, re.DOTALL)
             for jm in json_matches:
                 try:
                     data = json.loads(jm)
-                    for item in data:
-                        com_id = str(item.get("com_id", "")).strip()
-                        raw_name = str(item.get("com_name", "")).strip()
-                        raw_sellrate = str(item.get("sellrate", "")).strip()
-                        raw_diff = str(item.get("selldiff", "0")).strip()
-                        price = _extract_number(raw_sellrate)
-                        diff_val = _extract_number(raw_diff)
+                    for row in data:
+                        com_id = str(row.get("com_id", "")).strip()
+                        raw_name = str(row.get("com_name", "")).strip()
+                        price = _extract_number(str(row.get("sellrate", "")))
+                        diff_val = _extract_number(str(row.get("selldiff", "")))
                         if not price or not raw_name:
                             continue
-
-                        resolved = _resolve_city_and_product(raw_name, com_id)
-                        key = (resolved["city_code"], resolved["product_id"])
-                        city_rates_dict[key] = ParsedCityRate(
+                        resolved = _resolve_city_and_product(raw_name, com_id, price_hint=price)
+                        _register(_build_validated_item(
                             city_code=resolved["city_code"],
                             city_display_name=resolved["city_display_name"],
                             product_id=resolved["product_id"],
@@ -287,37 +620,24 @@ def parse_kjpl_all_city_rates(html_content: str, reference_time: datetime | None
                             source_product_id=com_id or None,
                             raw_source_name=raw_name,
                             diff_rate=diff_val,
-                        )
+                        ))
                 except Exception as e:
                     errors.append(f"JSON script parse error: {e}")
 
-    # 4. Strategy B: HTML Tables with product rows (TRs with data attributes or product text)
-    table_rows = soup.find_all("tr")
-    for tr in table_rows:
-        com_id = tr.get("data-com-id") or tr.get("id")
-        cells = [c.get_text(" ", strip=True) for c in tr.find_all(["td", "th"])]
-        if not cells or len(cells) < 2:
+    # 2. Explicit structured city table rows with data-com-id and td.rate (e.g., hydrated fixtures)
+    for tr in soup.select("tr[data-com-id]"):
+        com_id = str(tr.get("data-com-id", "")).strip()
+        rate_cell = tr.select_one("td.rate")
+        name_cell = tr.select_one("td.product-name") or tr.find("td")
+        if not rate_cell or not name_cell:
             continue
-
-        row_text = " ".join(cells)
-        # Check if row looks like a bullion product
-        is_bullion_row = any(w in row_text.upper() for w in ["GOLD", "SILVER", "MJDTA", "CHENNAI", "BANGALORE", "MUMBAI", "COIMBATORE", "HYDERABAD"])
-        if not is_bullion_row:
+        price = _extract_number(rate_cell.get_text(" ", strip=True))
+        raw_name = name_cell.get_text(" ", strip=True)
+        if not price or not raw_name:
             continue
-
-        raw_name = cells[0]
-        # Identify price cell: usually last or cell with largest numerical value
-        numbers = [_extract_number(c) for c in cells]
-        valid_numbers = [n for n in numbers if n is not None and n > 50.0]
-        if not valid_numbers:
-            continue
-
-        price = valid_numbers[-1]  # rate is typically the last column
-        resolved = _resolve_city_and_product(raw_name, str(com_id) if com_id else None)
-        key = (resolved["city_code"], resolved["product_id"])
-
-        if key not in city_rates_dict:
-            city_rates_dict[key] = ParsedCityRate(
+        resolved = _resolve_city_and_product(raw_name, com_id, price_hint=price)
+        if (resolved["city_code"], resolved["product_id"]) not in city_rates_dict:
+            _register(_build_validated_item(
                 city_code=resolved["city_code"],
                 city_display_name=resolved["city_display_name"],
                 product_id=resolved["product_id"],
@@ -329,59 +649,78 @@ def parse_kjpl_all_city_rates(html_content: str, reference_time: datetime | None
                 rate_type=resolved["rate_type"],
                 price=price,
                 currency="INR",
-                source_product_id=str(com_id) if com_id else None,
+                source_product_id=com_id or None,
                 raw_source_name=raw_name,
-            )
+            ))
 
-    # 5. Always include MJDTA reference rates if parsed and not yet in dict
-    if mjdta_gold:
-        gold_key = ("CHENNAI", "MJDTA_GOLD_24K")
-        if gold_key not in city_rates_dict:
-            city_rates_dict[gold_key] = ParsedCityRate(
-                city_code="CHENNAI",
-                city_display_name="Chennai",
-                product_id="MJDTA_GOLD_24K",
-                product_name="MJDTA Gold 24K Pure (Chennai Benchmark)",
-                metal="GOLD",
-                purity=0.999,
-                weight=1.0,
-                unit="1g",
-                rate_type="MJDTA_BENCHMARK",
-                price=mjdta_gold,
-                currency="INR",
-                source_product_id="MJDTA_GOLD",
-                raw_source_name="Gold MJDTA",
-            )
-    if mjdta_silver:
-        silver_key = ("CHENNAI", "MJDTA_SILVER")
-        if silver_key not in city_rates_dict:
-            city_rates_dict[silver_key] = ParsedCityRate(
-                city_code="CHENNAI",
-                city_display_name="Chennai",
-                product_id="MJDTA_SILVER",
-                product_name="MJDTA Silver Benchmark (Chennai)",
-                metal="SILVER",
-                purity=0.999,
-                weight=1.0,
-                unit="1g",
-                rate_type="MJDTA_BENCHMARK",
-                price=mjdta_silver,
-                currency="INR",
-                source_product_id="2",
-                raw_source_name="Silver MJDTA",
-            )
+    # 3. MJDTA Gold & Silver Benchmarks (Chennai)
+    if isinstance(mjdta_gold, (int, float)):
+        _register(_build_validated_item(
+            city_code="CHENNAI",
+            city_display_name="Chennai",
+            product_id="MJDTA_GOLD_24K",
+            product_name="MJDTA Gold 24K Pure (Chennai Benchmark)",
+            metal="GOLD",
+            purity=0.999,
+            weight=1.0,
+            unit="1g",
+            rate_type="MJDTA_BENCHMARK",
+            price=float(mjdta_gold),
+            currency="INR",
+            source_product_id="MJDTA_GOLD",
+            raw_source_name="MJDTA GOLD (Without GST)",
+        ))
+    if isinstance(mjdta_gold_with_gst, (int, float)):
+        _register(_build_validated_item(
+            city_code="CHENNAI",
+            city_display_name="Chennai",
+            product_id="MJDTA_GOLD_24K_GST",
+            product_name="MJDTA Gold 24K (With 3% GST)",
+            metal="GOLD",
+            purity=0.999,
+            weight=1.0,
+            unit="1g",
+            rate_type="MJDTA_BENCHMARK",
+            price=float(mjdta_gold_with_gst),
+            currency="INR",
+            source_product_id="MJDTA_GOLD_GST",
+            raw_source_name="MJDTA GOLD (With GST)",
+        ))
+    if isinstance(mjdta_silver, (int, float)):
+        _register(_build_validated_item(
+            city_code="CHENNAI",
+            city_display_name="Chennai",
+            product_id="MJDTA_SILVER",
+            product_name="MJDTA Silver Benchmark (Chennai)",
+            metal="SILVER",
+            purity=0.999,
+            weight=1.0,
+            unit="1g",
+            rate_type="MJDTA_BENCHMARK",
+            price=float(mjdta_silver),
+            currency="INR",
+            source_product_id="2",
+            raw_source_name="MJDTA SILVER (Without GST)",
+        ))
+
+    # 4. LBMA London Fixes (strictly USD/oz)
+    for lbma_item in _extract_lbma_london_fixes(soup):
+        _register(lbma_item)
 
     sorted_rates = sorted(city_rates_dict.values(), key=lambda r: (r.metal, r.city_code, r.product_id))
 
     return ParsedKJPLPayload(
         observed_at=now,
+        pipeline="KJPL_MJDTA" if not any(r.rate_type in ("RETAIL", "WHOLESALE") for r in sorted_rates) else "KJPL_HTML",
         source_updated_time=source_clock_time,
         source_updated_at=source_published_at,
-        mjdta_gold=mjdta_gold,
-        mjdta_silver=mjdta_silver,
+        source_timestamp_precision=source_timestamp_precision,
+        mjdta_gold=float(mjdta_gold) if isinstance(mjdta_gold, (int, float)) else None,
+        mjdta_silver=float(mjdta_silver) if isinstance(mjdta_silver, (int, float)) else None,
         mjdta_gold_with_gst=mjdta_gold_with_gst,
         mjdta_silver_with_gst=mjdta_silver_with_gst,
         city_rates=sorted_rates,
+        quarantined_rates=quarantined_list,
         raw_products_count=len(sorted_rates),
         extraction_errors=errors,
     )

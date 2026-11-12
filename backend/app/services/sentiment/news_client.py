@@ -295,8 +295,19 @@ class NewsClient:
     ) -> list[NewsArticle]:
         """
         Executes focused search queries across the macro/gold taxonomy groups.
-        Consolidates and deduplicates all results.
+        Consolidates, deduplicates, and records per-group collection health.
         """
+        from app.services.sentiment.provenance import (
+            CLUSTER_VERSION,
+            COLLECTOR_VERSION,
+            ProvenanceStatus,
+            QUERY_VERSION,
+            compute_canonical_url,
+            compute_content_fingerprint,
+            compute_story_cluster_id,
+            normalize_language,
+        )
+
         target_groups = groups or QUERY_GROUPS
         hours = lookback_hours if lookback_hours is not None else DEFAULT_LOOKBACK_HOURS
         now = datetime.now(timezone.utc)
@@ -305,30 +316,87 @@ class NewsClient:
         all_articles: list[NewsArticle] = []
         seen_urls: set[str] = set()
         seen_titles: set[str] = set()
+        group_health: list[dict[str, Any]] = []
+        raw_fetched = 0
 
         for group_name, queries in target_groups.items():
-            # Pick primary representative query for the group
             query_str = queries[0]
             print(f"[NEWS] Querying group [{group_name}]: '{query_str}'...")
+            group_error: str | None = None
+            group_articles: list[NewsArticle] = []
 
-            group_articles = self.search(
-                query=query_str,
-                start_datetime=start,
-                end_datetime=now,
-                max_records=max_records_per_group,
-                raise_on_error=False,
-                enable_fallback=True,
+            try:
+                group_articles = self.search(
+                    query=query_str,
+                    start_datetime=start,
+                    end_datetime=now,
+                    max_records=max_records_per_group,
+                    raise_on_error=True,
+                    enable_fallback=False,
+                )
+            except Exception as gdelt_exc:
+                try:
+                    group_articles = self.search_rss(
+                        query=query_str,
+                        max_records=max_records_per_group,
+                        start_datetime=start,
+                        end_datetime=now,
+                    )
+                except Exception as rss_exc:
+                    group_error = f"GDELT: {gdelt_exc}; RSS: {rss_exc}"
+                    group_articles = []
+
+            raw_fetched += len(group_articles)
+            group_health.append(
+                {
+                    "query_id": group_name,
+                    "query": query_str,
+                    "fetched": len(group_articles),
+                    "ok": group_error is None,
+                    "error": group_error,
+                }
             )
 
             for art in group_articles:
-                canon_url = normalize_url(art.url)
+                canon_url = compute_canonical_url(art.url) or normalize_url(art.url)
                 norm_title = normalize_title(art.title)
                 if canon_url in seen_urls or norm_title in seen_titles:
                     continue
                 seen_urls.add(canon_url)
                 seen_titles.add(norm_title)
+
+                first_seen = art.first_seen_at or art.ingested_at or now
+                lang_norm = normalize_language(art.language)
+                story_cluster_id, cluster_key = compute_story_cluster_id(
+                    art.title, art.published_at, CLUSTER_VERSION
+                )
+                art.first_seen_at = first_seen
+                art.ingested_at = art.ingested_at or first_seen
+                art.canonical_url = canon_url
+                art.content_fingerprint = compute_content_fingerprint(art.title, canon_url)
+                art.query_id = group_name
+                art.query_version = QUERY_VERSION
+                art.collector_version = COLLECTOR_VERSION
+                art.language = lang_norm
+                art.provenance_status = ProvenanceStatus.VERIFIED_SOURCE.value
+                art.story_cluster_id = story_cluster_id
+                art.cluster_key = cluster_key
+                art.cluster_version = CLUSTER_VERSION
                 all_articles.append(art)
 
+        self.last_collection_health = {
+            "started_at": now.isoformat(),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "query_version": QUERY_VERSION,
+            "collector_version": COLLECTOR_VERSION,
+            "cluster_version": CLUSTER_VERSION,
+            "queries_attempted": len(target_groups),
+            "queries_succeeded": sum(1 for g in group_health if g["ok"]),
+            "queries_failed": sum(1 for g in group_health if not g["ok"]),
+            "raw_fetched": raw_fetched,
+            "unique_collected": len(all_articles),
+            "groups": group_health,
+        }
         print(f"[NEWS] Consolidated {len(all_articles)} unique articles across {len(target_groups)} query groups.")
         return all_articles
 
@@ -536,6 +604,7 @@ class NewsClient:
             source=source,
             language=language,
             ingested_at=now_utc,
+            first_seen_at=now_utc,
         )
 
     @classmethod
@@ -575,6 +644,18 @@ class NewsClient:
         archive_path.parent.mkdir(parents=True, exist_ok=True)
         live_path.parent.mkdir(parents=True, exist_ok=True)
 
+        from app.services.sentiment.archive_audit import AUDITED_COLUMNS
+        from app.services.sentiment.provenance import (
+            CLUSTER_VERSION,
+            COLLECTOR_VERSION,
+            ProvenanceStatus,
+            QUERY_VERSION,
+            compute_canonical_url,
+            compute_content_fingerprint,
+            compute_story_cluster_id,
+            normalize_language,
+        )
+
         # -------------------------------------------------------------
         # STEP 1: Process and enrich candidates
         # -------------------------------------------------------------
@@ -591,7 +672,7 @@ class NewsClient:
             if pub_dt > now + timedelta(minutes=15):
                 continue
 
-            canon_url = normalize_url(a.url)
+            canon_url = a.canonical_url or compute_canonical_url(a.url) or normalize_url(a.url)
             norm_title = normalize_title(a.title)
             if not canon_url or not norm_title:
                 continue
@@ -603,26 +684,52 @@ class NewsClient:
                 reference_time=now,
             )
 
-            ingested_iso = a.ingested_at.isoformat() if a.ingested_at else now.isoformat()
+            # first_seen_at must strictly reflect genuine ingest time (never published_at).
+            first_seen_dt = a.first_seen_at or a.ingested_at or now
+            if first_seen_dt.tzinfo is None:
+                first_seen_dt = first_seen_dt.replace(tzinfo=timezone.utc)
+            else:
+                first_seen_dt = first_seen_dt.astimezone(timezone.utc)
+
+            first_seen_iso = first_seen_dt.isoformat()
+            story_cluster_id = a.story_cluster_id or impact.get("story_cluster_id")
+            if not story_cluster_id:
+                story_cluster_id, _ = compute_story_cluster_id(a.title, pub_dt, CLUSTER_VERSION)
+            lang_norm = normalize_language(a.language)
+            fingerprint = a.content_fingerprint or compute_content_fingerprint(a.title, canon_url)
 
             valid_candidates.append({
                 "published_at": pub_dt.isoformat(),
                 "published_dt": pub_dt,
-                "ingested_at": ingested_iso,
+                "first_seen_at": first_seen_iso,
+                "ingested_at": first_seen_iso,
                 "title": a.title,
                 "url": a.url,
                 "canonical_url": canon_url,
                 "normalized_title": norm_title,
                 "source": a.source,
-                "language": a.language or "en",
+                "language_raw": a.language or "",
+                "language": lang_norm,
+                "content_fingerprint": fingerprint,
+                "story_cluster_id": story_cluster_id,
+                "cluster_version": a.cluster_version or CLUSTER_VERSION,
+                "provenance_status": a.provenance_status or ProvenanceStatus.VERIFIED_SOURCE.value,
+                "query_id": a.query_id or "live_collect",
+                "query_version": a.query_version or QUERY_VERSION,
+                "collector_version": a.collector_version or COLLECTOR_VERSION,
                 "is_gold_relevant": rel.is_gold_relevant,
                 "gold_relevance_score": rel.gold_relevance_score,
                 "primary_category": rel.primary_category.value if hasattr(rel.primary_category, "value") else str(rel.primary_category),
                 "driver_category": impact["driver_category"],
                 "directional_implication": impact["directional_implication"],
+                "general_tone": impact["general_tone"],
+                "gold_impact": impact["gold_impact"],
+                "driver": impact["driver"],
+                "surprise": impact["surprise"],
+                "is_price_report": impact["is_price_report"],
                 "confidence": impact["confidence"],
                 "evidence_rationale": impact["evidence_rationale"],
-                "cluster_key": impact["cluster_key"],
+                "cluster_key": a.cluster_key or impact["cluster_key"],
             })
 
         # -------------------------------------------------------------
@@ -637,9 +744,13 @@ class NewsClient:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row.get("url"):
-                        existing_archive_urls.add(normalize_url(row["url"]))
+                        existing_archive_urls.add(compute_canonical_url(row["url"]) or normalize_url(row["url"]))
                     if row.get("title"):
                         existing_archive_titles.add(normalize_title(row["title"]))
+
+        audited_archive_path = archive_path.parent / "news_archive_audited.csv"
+        audited_exists = audited_archive_path.exists()
+        new_archive_rows: list[dict[str, Any]] = []
 
         new_archive_count = 0
         with archive_path.open("a", newline="", encoding="utf-8") as f:
@@ -660,7 +771,33 @@ class NewsClient:
                 })
                 existing_archive_urls.add(cand["canonical_url"])
                 existing_archive_titles.add(cand["normalized_title"])
+                new_archive_rows.append(
+                    {
+                        "published_at": cand["published_at"],
+                        "first_seen_at": cand["first_seen_at"],
+                        "title": cand["title"],
+                        "url": cand["url"],
+                        "canonical_url": cand["canonical_url"],
+                        "source": cand["source"],
+                        "language_raw": cand["language_raw"],
+                        "language": cand["language"],
+                        "content_fingerprint": cand["content_fingerprint"],
+                        "story_cluster_id": cand["story_cluster_id"],
+                        "cluster_key": cand["cluster_key"],
+                        "cluster_version": cand["cluster_version"],
+                        "provenance_status": cand["provenance_status"],
+                        "exclusion_reason": "",
+                        "query_id": cand["query_id"],
+                        "query_version": cand["query_version"],
+                        "collector_version": cand["collector_version"],
+                    }
+                )
                 new_archive_count += 1
+
+        if new_archive_rows and audited_exists:
+            with audited_archive_path.open("a", newline="", encoding="utf-8") as af:
+                awriter = csv.DictWriter(af, fieldnames=AUDITED_COLUMNS)
+                awriter.writerows(new_archive_rows)
 
         # -------------------------------------------------------------
         # STEP 3: Strictly Fresh Live Dataset (Pruned & Clustered)
@@ -690,9 +827,16 @@ class NewsClient:
             except Exception:
                 pass
 
-        # Add newly collected candidates to live pool
+        # Add newly collected candidates to live pool, monotonically preserving earliest first_seen_at (F-04)
         for cand in valid_candidates:
-            live_pool[cand["canonical_url"]] = cand
+            c_url = cand["canonical_url"]
+            existing = live_pool.get(c_url)
+            if existing is not None:
+                prev_fs = existing.get("first_seen_at") or existing.get("ingested_at")
+                if prev_fs:
+                    cand_fs = cand.get("first_seen_at")
+                    cand["first_seen_at"] = min(prev_fs, cand_fs) if cand_fs else prev_fs
+            live_pool[c_url] = cand
 
         # Filter strictly for freshness and relevance
         live_cutoff = now - timedelta(hours=max_live_retention_hours)
@@ -746,40 +890,70 @@ class NewsClient:
         # Write out live_news.csv
         live_fieldnames = [
             "published_at",
+            "first_seen_at",
             "ingested_at",
             "title",
             "url",
+            "canonical_url",
             "source",
             "language",
             "is_gold_relevant",
             "primary_category",
             "driver_category",
             "directional_implication",
+            "general_tone",
+            "gold_impact",
+            "driver",
+            "surprise",
+            "is_price_report",
             "confidence",
             "evidence_rationale",
             "cluster_key",
+            "story_cluster_id",
+            "cluster_version",
             "syndicated_copies_count",
+            "provenance_status",
+            "query_id",
+            "query_version",
+            "collector_version",
         ]
 
         with live_path.open("w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=live_fieldnames)
             writer.writeheader()
             for art in clustered_live_articles:
+                story_cid = art.get("story_cluster_id")
+                if not story_cid:
+                    story_cid, _ = compute_story_cluster_id(art["title"], art["published_dt"], CLUSTER_VERSION)
+                first_seen_val = art.get("first_seen_at") or art.get("ingested_at") or now.isoformat()
                 writer.writerow({
                     "published_at": art["published_at"],
-                    "ingested_at": art.get("ingested_at") or now.isoformat(),
+                    "first_seen_at": first_seen_val,
+                    "ingested_at": art.get("ingested_at") or first_seen_val,
                     "title": art["title"],
                     "url": art["url"],
+                    "canonical_url": art.get("canonical_url") or compute_canonical_url(art["url"]),
                     "source": art["source"],
-                    "language": art.get("language") or "en",
+                    "language": normalize_language(art.get("language")),
                     "is_gold_relevant": art.get("is_gold_relevant", True),
                     "primary_category": art.get("primary_category", "GOLD_DIRECT"),
                     "driver_category": art.get("driver_category", GoldDriver.OTHER_MACRO),
-                    "directional_implication": art.get("directional_implication", "UNCERTAIN"),
+                    "directional_implication": art.get("directional_implication", "UNKNOWN"),
+                    "general_tone": art.get("general_tone", "UNKNOWN"),
+                    "gold_impact": art.get("gold_impact", art.get("directional_implication", "UNKNOWN")),
+                    "driver": art.get("driver", "UNKNOWN"),
+                    "surprise": art.get("surprise", "UNKNOWN"),
+                    "is_price_report": art.get("is_price_report", False),
                     "confidence": art.get("confidence", "LOW"),
                     "evidence_rationale": art.get("evidence_rationale", ""),
                     "cluster_key": art.get("cluster_key", ""),
+                    "story_cluster_id": story_cid,
+                    "cluster_version": art.get("cluster_version") or CLUSTER_VERSION,
                     "syndicated_copies_count": art.get("syndicated_copies_count", 1),
+                    "provenance_status": art.get("provenance_status") or ProvenanceStatus.VERIFIED_SOURCE.value,
+                    "query_id": art.get("query_id") or "live_collect",
+                    "query_version": art.get("query_version") or QUERY_VERSION,
+                    "collector_version": art.get("collector_version") or COLLECTOR_VERSION,
                 })
 
         return {

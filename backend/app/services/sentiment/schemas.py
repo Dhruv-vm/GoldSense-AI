@@ -36,6 +36,60 @@ class NewsCategory(str, Enum):
     OTHER = "OTHER"
 
 
+class GeneralTone(str, Enum):
+    POSITIVE = "POSITIVE"
+    NEGATIVE = "NEGATIVE"
+    NEUTRAL = "NEUTRAL"
+    UNKNOWN = "UNKNOWN"
+
+
+class GoldImpactDirection(str, Enum):
+    BULLISH = "BULLISH"
+    BEARISH = "BEARISH"
+    MIXED = "MIXED"
+    NEUTRAL = "NEUTRAL"
+    UNKNOWN = "UNKNOWN"
+
+
+class GoldMacroDriver(str, Enum):
+    FED_POLICY = "FED_POLICY"
+    US_INTEREST_RATES = "US_INTEREST_RATES"
+    INFLATION = "INFLATION"
+    USD = "USD"
+    INR = "INR"
+    GEOPOLITICS = "GEOPOLITICS"
+    CENTRAL_BANKS = "CENTRAL_BANKS"
+    INDIAN_PHYSICAL_DEMAND = "INDIAN_PHYSICAL_DEMAND"
+    GOLD_ETF = "GOLD_ETF"
+    INDIA_IMPORT_DUTY_POLICY = "INDIA_IMPORT_DUTY_POLICY"
+    GOLD_PRICE_REPORT = "GOLD_PRICE_REPORT"
+    OTHER_MACRO = "OTHER_MACRO"
+    UNKNOWN = "UNKNOWN"
+
+
+class MacroSurprise(str, Enum):
+    HAWKISH_SURPRISE = "HAWKISH_SURPRISE"
+    DOVISH_SURPRISE = "DOVISH_SURPRISE"
+    POSITIVE_SURPRISE = "POSITIVE_SURPRISE"
+    NEGATIVE_SURPRISE = "NEGATIVE_SURPRISE"
+    AS_EXPECTED = "AS_EXPECTED"
+    UNKNOWN = "UNKNOWN"
+
+
+class GoldSentimentResult(BaseModel):
+    general_tone: GeneralTone = GeneralTone.UNKNOWN
+    gold_impact: GoldImpactDirection = GoldImpactDirection.UNKNOWN
+    driver: GoldMacroDriver = GoldMacroDriver.UNKNOWN
+    surprise: MacroSurprise = MacroSurprise.UNKNOWN
+    is_price_report: bool = False
+    confidence: str = "LOW"
+    evidence_rationale: str = ""
+    sentiment_version: str = "GOLD_SENTIMENT_V3"
+    model_name: str = "deterministic_rules_v2"
+    model_digest: str | None = None
+    prompt_version: str | None = None
+
+
 class NewsArticle(BaseModel):
     title: str
     url: str
@@ -44,10 +98,24 @@ class NewsArticle(BaseModel):
     language: str | None = None
     description: str | None = None
     ingested_at: datetime | None = None
+    first_seen_at: datetime | None = None
+    canonical_url: str | None = None
+    content_fingerprint: str | None = None
+    query_id: str | None = None
+    query_version: str | None = None
+    collector_version: str | None = None
+    provenance_status: str | None = None
+    story_cluster_id: str | None = None
+    cluster_version: str | None = None
     is_gold_relevant: bool | None = None
     primary_category: str | None = None
     driver_category: str | None = None
     directional_implication: str | None = None
+    general_tone: str | None = None
+    gold_impact: str | None = None
+    driver: str | None = None
+    surprise: str | None = None
+    is_price_report: bool | None = None
     confidence: str | None = None
     evidence_rationale: str | None = None
     cluster_key: str | None = None

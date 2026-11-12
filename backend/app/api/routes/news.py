@@ -142,9 +142,15 @@ def get_latest_news(
                     "url": r.get("url", ""),
                     "source": r.get("source", ""),
                     "published_at": r.get("published_at", ""),
-                    "sentiment_label": "neutral",
+                    "general_tone": impact["general_tone"],
+                    "gold_impact": impact["gold_impact"],
+                    "driver": impact["driver"],
+                    "surprise": impact["surprise"],
+                    "is_price_report": impact["is_price_report"],
+                    # Legacy fields kept strictly separated from FinBERT general tone
+                    "sentiment_label": impact["general_tone"].lower(),
                     "sentiment_score": 0.0,
-                    "is_gold_relevant": rel.is_gold_relevant,
+                    "is_gold_relevant": rel.is_gold_relevant and not impact["is_price_report"],
                     "primary_category": rel.primary_category.value if hasattr(rel.primary_category, "value") else str(rel.primary_category),
                     "driver_category": impact["driver_category"],
                     "directional_implication": impact["directional_implication"],
@@ -225,23 +231,28 @@ def get_news_archive(
 @router.get("/summary")
 def get_news_summary():
     """
-    Aggregated news intelligence metrics.
+    Aggregated news intelligence metrics separating gold-specific impact from generic tone.
     """
     articles = get_latest_news(limit=50)
     total = len(articles)
     if total == 0:
         return {"total": 0, "positive_ratio": 0.0, "negative_ratio": 0.0, "neutral_ratio": 0.0}
 
-    pos = sum(1 for a in articles if a["sentiment_label"] in ("positive", "bullish"))
-    neg = sum(1 for a in articles if a["sentiment_label"] in ("negative", "bearish"))
-    neu = sum(1 for a in articles if a["sentiment_label"] in ("neutral", "uncertain", "mixed"))
-    gold_rel = sum(1 for a in articles if a["is_gold_relevant"])
+    bullish = sum(1 for a in articles if a.get("gold_impact", a.get("directional_implication")) == "BULLISH")
+    bearish = sum(1 for a in articles if a.get("gold_impact", a.get("directional_implication")) == "BEARISH")
+    unknown_or_mixed = sum(
+        1 for a in articles if a.get("gold_impact", a.get("directional_implication")) in ("NEUTRAL", "MIXED", "UNKNOWN")
+    )
+    gold_rel = sum(1 for a in articles if a["is_gold_relevant"] and not a.get("is_price_report"))
 
     return {
         "total_analyzed": total,
-        "positive_ratio": round(pos / total, 2),
-        "negative_ratio": round(neg / total, 2),
-        "neutral_ratio": round(neu / total, 2),
+        "bullish_count": bullish,
+        "bearish_count": bearish,
+        "unknown_or_neutral_count": unknown_or_mixed,
+        "positive_ratio": round(bullish / total, 2),
+        "negative_ratio": round(bearish / total, 2),
+        "neutral_ratio": round(unknown_or_mixed / total, 2),
         "gold_relevant_count": gold_rel,
         "gold_relevant_ratio": round(gold_rel / total, 2),
     }

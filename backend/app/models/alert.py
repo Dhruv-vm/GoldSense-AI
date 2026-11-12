@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
+from decimal import Decimal
+from sqlalchemy import Boolean, DateTime, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -16,7 +17,7 @@ class AlertRule(Base):
     alert_type: Mapped[str] = mapped_column(String(50), nullable=False)
     # Types: "PRICE_ABOVE", "PRICE_BELOW", "PREMIUM_ABOVE", "PREMIUM_BELOW", "DAILY_CHANGE_PCT"
     target_metric: Mapped[str] = mapped_column(String(50), default="KJPL_GOLD", nullable=False)
-    threshold: Mapped[float] = mapped_column(Float, nullable=False)
+    threshold: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

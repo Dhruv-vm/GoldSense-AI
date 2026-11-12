@@ -1,25 +1,24 @@
-import yfinance as yf
+from __future__ import annotations
 
 
 class MarketClient:
-    def _get_latest_close(self, symbol: str) -> float:
-        ticker = yf.Ticker(symbol)
-        history = ticker.history(period="5d")
+    """
+    Deprecated external Yahoo Finance market client.
+    Disabled per VMD Bullion exclusive-KJPL data-source policy: international Spot Gold,
+    Spot Silver, and Spot INR must originate exclusively from KJPL Type 1 feeds.
+    """
 
-        if history.empty:
-            raise RuntimeError(f"No market data returned for {symbol}")
-
-        close = history["Close"].dropna()
-
-        if close.empty:
-            raise RuntimeError(f"Close price unavailable for {symbol}")
-
-        return float(close.iloc[-1])
+    def _disabled(self, symbol: str) -> float:
+        raise RuntimeError(
+            f"External Yahoo Finance provider disabled for '{symbol}'. "
+            "Use KJPL Live Terminal Type 1 feeds (KJPL_SPOT_GOLD_USD, KJPL_SPOT_SILVER_USD, KJPL_SPOT_USDINR)."
+        )
 
     def get_usdinr(self) -> float:
-        return self._get_latest_close("USDINR=X")
+        return self._disabled("USDINR")
 
     def get_gold_usd(self) -> float:
-        return self._get_latest_close("GC=F")
+        return self._disabled("XAUUSD")
+
     def get_silver_usd(self) -> float:
-        return self._get_latest_close("SI=F")
+        return self._disabled("XAGUSD")

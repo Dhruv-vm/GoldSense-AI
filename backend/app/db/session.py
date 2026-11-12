@@ -1,58 +1,142 @@
+from __future__ import annotations
+
 import os
 from pathlib import Path
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from typing import Generator
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 DEFAULT_DB_DIR = Path("data")
-DEFAULT_DB_DIR.mkdir(parents=True, exist_ok=True)
-SQLITE_URL = f"sqlite:///{DEFAULT_DB_DIR.resolve()}/goldsense.db"
+SQLITE_PATH = Path(os.environ.get("GOLDSENSE_SQLITE_PATH", str(DEFAULT_DB_DIR / "goldsense.db")))
+SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
+SQLITE_URL = f"sqlite:///{SQLITE_PATH.resolve()}"
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "development").lower()
-IS_POSTGRES = bool(DATABASE_URL and not str(DATABASE_URL).startswith("sqlite"))
+USE_NULLPOOL = os.environ.get("DB_USE_NULLPOOL", "false").lower() in ("true", "1", "yes")
+IS_POSTGRES = bool(DATABASE_URL and not str(DATABASE_URL).strip().lower().startswith("sqlite"))
 
 
 def normalize_database_url(url: str | None) -> str | None:
-    """Normalize postgres:// and postgresql:// URIs to use psycopg v3 driver."""
+    """
+    Normalize postgres:// and postgresql:// URIs to use psycopg v3 driver.
+    Ensures Neon PostgreSQL endpoints default to sslmode=require if unspecified.
+    """
     if not url:
         return None
-    url = url.strip()
-    if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+psycopg://", 1)
-    if url.startswith("postgresql://") and not url.startswith("postgresql+"):
-        return url.replace("postgresql://", "postgresql+psycopg://", 1)
-    return url
+    cleaned = url.strip()
+    if cleaned.startswith("postgres://"):
+        cleaned = cleaned.replace("postgres://", "postgresql+psycopg://", 1)
+    elif cleaned.startswith("postgresql://") and not cleaned.startswith("postgresql+"):
+        cleaned = cleaned.replace("postgresql://", "postgresql+psycopg://", 1)
+
+    if cleaned.startswith("postgresql+psycopg://"):
+        parsed = urlparse(cleaned)
+        qs = parse_qs(parsed.query)
+        # Neon Free Tier requires TLS; default to sslmode=require when connecting to Neon or cloud Postgres
+        if "sslmode" not in qs and parsed.hostname and "localhost" not in parsed.hostname and "127.0.0.1" not in parsed.hostname:
+            qs["sslmode"] = ["require"]
+            new_query = urlencode(qs, doseq=True)
+            cleaned = urlunparse(parsed._replace(query=new_query))
+    return cleaned
 
 
-engine = None
-normalized_url = normalize_database_url(DATABASE_URL)
-if normalized_url and not normalized_url.startswith("sqlite"):
-    try:
-        candidate_engine = create_engine(normalized_url, pool_pre_ping=True)
-        with candidate_engine.connect():
-            engine = candidate_engine
-    except Exception as exc:
-        if ENVIRONMENT == "production" and os.environ.get("RENDER"):
+def build_engine(
+    url: str | None = None,
+    *,
+    use_nullpool: bool | None = None,
+    environment: str | None = None,
+) -> Engine:
+    """Create a configured SQLAlchemy Engine for Neon PostgreSQL or SQLite."""
+    target_env = (environment or ENVIRONMENT).lower()
+    raw_url = url if url is not None else DATABASE_URL
+    norm_url = normalize_database_url(raw_url)
+    nullpool_mode = USE_NULLPOOL if use_nullpool is None else use_nullpool
+
+    if norm_url and not norm_url.startswith("sqlite"):
+        kwargs: dict = {
+            "pool_pre_ping": True,
+            "connect_args": {"connect_timeout": 10},
+        }
+        if nullpool_mode:
+            kwargs["poolclass"] = NullPool
+        else:
+            kwargs["pool_size"] = int(os.environ.get("DB_POOL_SIZE", "5"))
+            kwargs["max_overflow"] = int(os.environ.get("DB_MAX_OVERFLOW", "5"))
+            kwargs["pool_recycle"] = int(os.environ.get("DB_POOL_RECYCLE", "300"))
+
+        try:
+            candidate_engine = create_engine(norm_url, **kwargs)
+            with candidate_engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return candidate_engine
+        except Exception as exc:
+            # F-11: PostgreSQL failure must fail closed in ALL environments when PostgreSQL
+            # is configured — never silently degrade to local SQLite.
             raise RuntimeError(
-                f"[DATABASE ERROR] In production environment, failed to connect to specified "
-                f"DATABASE_URL (Supabase PostgreSQL): {exc}. Production must never silently fall back to local SQLite."
+                f"[DATABASE ERROR] Failed to connect to configured PostgreSQL database "
+                f"(environment={target_env}). Silent SQLite fallback is prohibited."
             ) from exc
-        engine = None
-elif ENVIRONMENT == "production" and os.environ.get("RENDER"):
-    raise RuntimeError(
-        "[DATABASE ERROR] In production environment, DATABASE_URL must be configured with a valid "
-        "Supabase PostgreSQL connection string. Production must never fall back to local SQLite."
-    )
 
-if engine is None:
-    # Resilient fallback: SQLite database for local and testing operations
-    engine = create_engine(
-        SQLITE_URL,
+    elif target_env == "production" or os.environ.get("REQUIRE_POSTGRES", "false").lower() in ("true", "1", "yes"):
+        raise RuntimeError(
+            "[DATABASE ERROR] PostgreSQL DATABASE_URL is required (production / REQUIRE_POSTGRES=true). "
+            "SQLite fallback is prohibited."
+        )
+
+    # Explicit local development / isolated testing SQLite engine (only when DATABASE_URL is unset or sqlite://)
+    sqlite_target = norm_url if (norm_url and norm_url.startswith("sqlite")) else SQLITE_URL
+    return create_engine(
+        sqlite_target,
         connect_args={"check_same_thread": False},
     )
+
+
+def is_postgres_configured(url: str | None = None) -> bool:
+    raw = url if url is not None else os.environ.get("DATABASE_URL")
+    return bool(raw and not str(raw).strip().lower().startswith("sqlite"))
+
+
+engine: Engine = build_engine()
 
 SessionLocal = sessionmaker(
     bind=engine,
     autoflush=False,
     autocommit=False,
 )
+
+
+def get_db() -> Generator[Session, None, None]:
+    """FastAPI dependency yielding a bounded database session."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def check_database_health() -> dict[str, object]:
+    """Probe live database connectivity and report dialect/pool status without swallowing failures."""
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        return {
+            "connected": True,
+            "dialect": engine.dialect.name,
+            "is_postgres": engine.dialect.name == "postgresql",
+            "environment": ENVIRONMENT,
+        }
+    except Exception as exc:
+        return {
+            "connected": False,
+            "dialect": engine.dialect.name,
+            "is_postgres": engine.dialect.name == "postgresql",
+            "environment": ENVIRONMENT,
+            "error": str(exc),
+        }
+    finally:
+        db.close()

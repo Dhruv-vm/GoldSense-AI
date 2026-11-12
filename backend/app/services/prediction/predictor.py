@@ -3,9 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 import pandas as pd
-import xgboost as xgb
 
 from app.services.data_service import get_market_overview, PROJECT_ROOT
+from app.services.prediction.forecast_engine import get_latest_mjdta_research_summary
 from app.services.sentiment.live_signal import get_live_news_intelligence
 
 MODEL_DIR = PROJECT_ROOT / "backend/ml/models"
@@ -42,7 +42,7 @@ def models_available() -> bool:
     return PRICE_MODEL_PATH.exists() and DIRECTION_MODEL_PATH.exists()
 
 
-def get_prediction_status() -> dict:
+def get_prediction_status(db=None) -> dict:
     """
     Evaluates ML pipeline status, dataset readiness, and outputs active prediction
     if models are trained and validated, or honest low-data status if in collection phase.
@@ -56,9 +56,9 @@ def get_prediction_status() -> dict:
             pass
 
     overview = get_market_overview()
-    derived = overview.get("derived", {})
-    market = overview.get("market", {})
-    kjpl = overview.get("kjpl", {})
+    derived = overview.get("derived") or {}
+    market = overview.get("market") or {}
+    kjpl = overview.get("kjpl") or {}
     news_intel = get_live_news_intelligence(window_hours=24)
 
     # Load baseline benchmarks if available
@@ -74,6 +74,7 @@ def get_prediction_status() -> dict:
             pass
 
     if not models_available() or sample_count < MIN_REQUIRED_SAMPLES:
+        shadow = get_mjdta_research_shadow_payload(db=db)
         return {
             "status": "EXPERIMENTAL_DATA_COLLECTION",
             "is_ready": False,
@@ -95,16 +96,20 @@ def get_prediction_status() -> dict:
                 "observation_time": overview.get("timestamp"),
             },
             "pipeline_specification": {
-                "target_instrument": "KJPL MJDTA 24K Pure Gold (INR / gram)",
-                "forecast_horizon": "1 Trading Day (Next Published Rate)",
-                "validation_methodology": "Walk-forward chronological holdout (strictly no-lookahead)",
+                "target_instrument": "KJPL MJDTA_GOLD_24K (EXCL_GST, 0.999 purity, INR / gram)",
+                "forecast_horizon": "1 & 3 Valid Distinct MJDTA Publications Ahead",
+                "validation_methodology": "Paired A/B/C/NO_CHANGE shadow walk-forward (`EXPERIMENT_PROTOCOL_V1`)",
+                "system_isolation": "Strictly isolated from 5-city live terminal rates and external LBMA/yfinance feeds",
                 "features_used": len(FEATURE_COLUMNS),
             },
             "news_intelligence": news_intel,
+            "mjdta_shadow_research": shadow,
         }
 
     # If models are present, load and execute
     try:
+        import xgboost as xgb
+
         price_model = xgb.XGBRegressor()
         price_model.load_model(str(PRICE_MODEL_PATH))
 
@@ -156,5 +161,23 @@ def get_prediction_status() -> dict:
         }
 
 
-def predict() -> dict:
-    return get_prediction_status()
+def get_mjdta_research_shadow_payload(db=None) -> dict:
+    """Return compact DB-backed MJDTA shadow & backtest summary."""
+    from app.db.session import ENVIRONMENT, is_postgres_configured
+    from app.services.data_service import init_database
+
+    # NEW-8: When non-production SQLite test clients hit routes without entering FastAPI lifespan,
+    # ensure tables exist on a fresh clean DB; PostgreSQL/production always relies on Alembic.
+    if ENVIRONMENT != "production" and not is_postgres_configured():
+        init_database()
+
+    res = get_latest_mjdta_research_summary(db=db, repo_root=PROJECT_ROOT)
+    return {
+        k: v
+        for k, v in res.items()
+        if k not in ("snapshots", "forecasts", "evaluations")
+    }
+
+
+def predict(db=None) -> dict:
+    return get_prediction_status(db=db)

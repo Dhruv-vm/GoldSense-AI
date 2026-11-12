@@ -1,73 +1,82 @@
 from __future__ import annotations
 
 import csv
+import os
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from typing import Any
+from sqlalchemy import select, desc
 
 from app.db.base import Base
-from app.db.session import engine, SessionLocal
-from app.models.gold_rate import GoldRate
-from app.models.market_rate import MarketRate
+from app.db.session import engine, SessionLocal, ENVIRONMENT, check_database_health
+from app.models.bullion import BullionLatestRate, BullionRateObservation, DataSourceStatus
 
 IST = ZoneInfo("Asia/Kolkata")
 TROY_OUNCE_GRAMS = 31.1034768
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 KJPL_CSV = PROJECT_ROOT / "data/kjpl/kjpl_rates.csv"
-MARKET_CSV = PROJECT_ROOT / "data/market/market_rates.csv"
 NEWS_CSV = PROJECT_ROOT / "data/news/news_articles.csv"
 NEWS_ARCHIVE_CSV = PROJECT_ROOT / "data/news/news_articles.csv"
 LIVE_NEWS_CSV = PROJECT_ROOT / "data/news/live_news.csv"
 ANALYZED_NEWS_CSV = PROJECT_ROOT / "backend/ml/data/processed/analyzed_news.csv"
 
-# Global rate limit for active market refreshes (minimum 60s cooldown)
-LAST_REFRESH_TIME: float = 0.0
-REFRESH_COOLDOWN_SECONDS: float = 60.0
+# Freshness thresholds (configurable in hours/seconds by feed type)
+MJDTA_FRESH_HOURS = float(os.environ.get("MJDTA_FRESH_HOURS", "16.0"))   # Twice-daily benchmark
+MJDTA_DELAYED_HOURS = float(os.environ.get("MJDTA_DELAYED_HOURS", "36.0"))
+LIVE_FEED_LIVE_SECONDS = float(os.environ.get("KJPL_LIVE_SECONDS", "120.0"))
+LIVE_FEED_FRESH_HOURS = float(os.environ.get("KJPL_LIVE_FRESH_HOURS", "4.0"))
+LIVE_FEED_DELAYED_HOURS = float(os.environ.get("KJPL_LIVE_DELAYED_HOURS", "24.0"))
 
 
 def init_database() -> None:
-    """Ensure database tables exist."""
+    """Create database tables in local development/test mode only; production relies on Alembic migrations."""
+    if ENVIRONMENT == "production":
+        return
     try:
+        import app.models  # noqa: F401
         Base.metadata.create_all(bind=engine)
     except Exception as e:
-        print(f"[DATA SERVICE] Warning creating tables: {e}")
+        print(f"[DATA SERVICE] Warning creating local tables: {e}")
 
 
 def get_market_trading_status() -> dict[str, Any]:
     """
-    Evaluate trading session status for both domestic Indian spot bullion
-    and international COMEX futures / global forex.
+    Evaluate trading session status for Indian physical bullion & KJPL terminal hours.
+    Does not fabricate international external feed statuses; tracks KJPL market schedule.
     """
     now_ist = datetime.now(IST)
-    weekday = now_ist.weekday()  # Monday is 0, Sunday is 6
+    weekday = now_ist.weekday()  # Monday=0 .. Sunday=6
     hour = now_ist.hour
     minute = now_ist.minute
 
-    # Indian Physical Market (KJPL / Ahmedabad spot)
     if weekday == 6:  # Sunday
         indian_status = "SUNDAY_CLOSED"
-        indian_desc = "Physical bullion market is closed on Sundays."
-    elif 10 <= hour < 19:
-        indian_status = "OPEN"
-        indian_desc = "Physical bullion market active (10:00 AM - 7:00 PM IST)."
+        indian_desc = "Indian physical bullion market and KJPL desk are closed on Sundays."
+    elif 9 <= hour < 23 or (hour == 23 and minute <= 30):
+        # Active MJDTA + MCX-linked KJPL live bullion desk window (09:00 AM - 11:30 PM IST Mon-Fri, 09:00 AM - 07:00 PM Sat)
+        if weekday == 5 and hour >= 19:
+            indian_status = "AFTER_HOURS"
+            indian_desc = "Saturday physical bullion trading hours concluded."
+        else:
+            indian_status = "OPEN"
+            indian_desc = "Indian physical bullion market & KJPL desk active."
     else:
         indian_status = "AFTER_HOURS"
-        indian_desc = "Physical bullion market after-hours."
+        indian_desc = "KJPL physical bullion market after-hours."
 
-    # US COMEX / Global Forex Market
-    # COMEX closed Saturday 02:30 IST to Monday 03:30 IST
-    if (weekday == 5 and (hour > 2 or (hour == 2 and minute >= 30))) or weekday == 6 or (weekday == 0 and (hour < 3 or (hour == 3 and minute < 30))):
+    # Keep global_futures_market key for backward schema compatibility, derived strictly from schedule/KJPL hours
+    if weekday == 6 or (weekday == 5 and hour >= 19):
         global_status = "WEEKEND_CLOSED"
-        global_desc = "COMEX & global forex closed for weekend."
-    elif 3 <= hour < 4:
+        global_desc = "KJPL international reference desk closed for weekend."
+    elif hour == 3:
         global_status = "DAILY_SETTLEMENT_BREAK"
-        global_desc = "CME daily maintenance & settlement pause."
+        global_desc = "Daily international bullion settlement pause."
     else:
         global_status = "OPEN"
-        global_desc = "Global precious metals futures & forex active."
+        global_desc = "KJPL international bullion reference feeds active."
 
     return {
         "indian_physical_market": indian_status,
@@ -78,57 +87,151 @@ def get_market_trading_status() -> dict[str, Any]:
     }
 
 
-def get_freshness_details(observed_at: datetime) -> dict[str, Any]:
-    """
-    Evaluate honest data freshness based on elapsed time from observation:
-      - FRESH:   < 4 hours
-      - DELAYED: 4 - 24 hours
-      - STALE:   > 24 hours
-    Returns status, numerical age in hours, and human-readable age string.
-    """
-    now_utc = datetime.now(timezone.utc)
-    if observed_at.tzinfo is None:
-        obs_utc = observed_at.replace(tzinfo=timezone.utc)
-    else:
-        obs_utc = observed_at.astimezone(timezone.utc)
-
-    age_seconds = max(0.0, (now_utc - obs_utc).total_seconds())
-    age_hours = round(age_seconds / 3600.0, 1)
-
+def _format_age_display(age_seconds: float) -> str:
+    if age_seconds < 60:
+        return f"{int(age_seconds)}s ago"
     if age_seconds < 3600:
-        mins = int(age_seconds / 60)
-        age_display = f"{mins}m ago"
-    elif age_seconds < 86400:
+        return f"{int(age_seconds / 60)}m ago"
+    if age_seconds < 86400:
         hours = int(age_seconds / 3600)
         mins = int((age_seconds % 3600) / 60)
-        age_display = f"{hours}h {mins}m ago" if mins > 0 else f"{hours}h ago"
-    else:
-        days = int(age_seconds / 86400)
-        hours = int((age_seconds % 86400) / 3600)
-        age_display = f"{days}d {hours}h ago"
+        return f"{hours}h {mins}m ago" if mins > 0 else f"{hours}h ago"
+    days = int(age_seconds / 86400)
+    hours = int((age_seconds % 86400) / 3600)
+    return f"{days}d {hours}h ago"
 
-    if age_hours < 4.0:
-        status = "FRESH"
-    elif age_hours < 24.0:
-        status = "DELAYED"
+
+def get_freshness_details(
+    reference_dt: datetime | None,
+    *,
+    rate_type: str = "RETAIL",
+    market_status_override: str | None = None,
+    source_unavailable: bool = False,
+) -> dict[str, Any]:
+    """
+    Evaluate honest freshness state tailored to feed cadence:
+      - MJDTA_BENCHMARK (twice daily): FRESH <16h, DELAYED 16-36h, STALE >36h
+      - Live feeds (KJPL_LIVE / RETAIL / WHOLESALE): LIVE <120s, FRESH <4h, DELAYED 4-24h, STALE >24h
+    Respects market-closed and source-unavailable states without fabricating activity.
+    """
+    if source_unavailable:
+        return {
+            "status": "SOURCE_UNAVAILABLE",
+            "age_hours": None,
+            "age_seconds": None,
+            "age_display": "Source unavailable",
+        }
+    if reference_dt is None:
+        return {
+            "status": "STALE",
+            "age_hours": None,
+            "age_seconds": None,
+            "age_display": "Unknown timestamp",
+        }
+
+    now_utc = datetime.now(timezone.utc)
+    obs_utc = reference_dt.replace(tzinfo=timezone.utc) if reference_dt.tzinfo is None else reference_dt.astimezone(timezone.utc)
+    age_seconds = max(0.0, (now_utc - obs_utc).total_seconds())
+    age_hours = round(age_seconds / 3600.0, 2)
+    age_display = _format_age_display(age_seconds)
+
+    if market_status_override in ("SUNDAY_CLOSED", "WEEKEND_CLOSED", "CLOSED"):
+        status = "MARKET_CLOSED"
+    elif rate_type in ("MJDTA_BENCHMARK", "LBMA_FIX"):
+        if age_hours < MJDTA_FRESH_HOURS:
+            status = "FRESH"
+        elif age_hours < MJDTA_DELAYED_HOURS:
+            status = "DELAYED"
+        else:
+            status = "STALE"
     else:
-        status = "STALE"
+        if age_seconds <= LIVE_FEED_LIVE_SECONDS:
+            status = "LIVE"
+        elif age_hours < LIVE_FEED_FRESH_HOURS:
+            status = "FRESH"
+        elif age_hours < LIVE_FEED_DELAYED_HOURS:
+            status = "DELAYED"
+        else:
+            status = "STALE"
 
     return {
         "status": status,
         "age_hours": age_hours,
+        "age_seconds": round(age_seconds, 1),
         "age_display": age_display,
     }
 
 
 def get_freshness_status(observed_at: datetime) -> str:
-    """Evaluate honest data freshness status: FRESH, DELAYED, or STALE."""
     return get_freshness_details(observed_at)["status"]
 
 
+def _get_latest_kjpl_from_db() -> dict[str, Any] | None:
+    """Query MJDTA Gold & Silver strictly from validated BullionLatestRate / BullionRateObservation."""
+    db = SessionLocal()
+    try:
+        gold_row = db.execute(
+            select(BullionLatestRate).where(
+                BullionLatestRate.city_code == "CHENNAI",
+                BullionLatestRate.product_id == "MJDTA_GOLD_24K",
+                BullionLatestRate.validation_status.in_(["VALID", "SUSPECT"]),
+            )
+        ).scalar_one_or_none()
+        if gold_row is None:
+            return None
+
+        silver_row = db.execute(
+            select(BullionLatestRate).where(
+                BullionLatestRate.city_code == "CHENNAI",
+                BullionLatestRate.product_id == "MJDTA_SILVER",
+                BullionLatestRate.validation_status.in_(["VALID", "SUSPECT"]),
+            )
+        ).scalar_one_or_none()
+
+        gold = float(gold_row.latest_price)
+        prev_gold = float(gold_row.previous_price) if gold_row.previous_price is not None else gold
+        silver = float(silver_row.latest_price) if silver_row is not None else None
+        change_inr = float(gold_row.change_inr)
+        change_pct = float(gold_row.change_pct)
+
+        pub_dt = gold_row.source_published_at
+        coll_dt = gold_row.last_collected_at
+        freshness = get_freshness_details(pub_dt or coll_dt, rate_type="MJDTA_BENCHMARK")
+
+        return {
+            "source": "KJPL (MJDTA Benchmark)",
+            "gold_mjdta": gold,
+            "silver_mjdta": silver,
+            "published_time": pub_dt.astimezone(IST).strftime("%d-%m-%Y %I:%M %p IST") if pub_dt else "Unverified date",
+            "source_published_at": pub_dt.isoformat() if pub_dt else None,
+            "observed_at": coll_dt.isoformat(),
+            "last_verified_at": gold_row.last_verified_at.isoformat(),
+            "currency": "INR",
+            "unit": "gram",
+            "change_24h_inr": round(change_inr, 2),
+            "change_24h_pct": round(change_pct, 2),
+            "freshness": freshness["status"],
+            "age_hours": freshness["age_hours"],
+            "age_display": freshness["age_display"],
+        }
+    finally:
+        db.close()
+
+
 def get_latest_kjpl_from_csv() -> dict[str, Any] | None:
-    """Read the latest KJPL record from canonical CSV."""
-    if not KJPL_CSV.exists():
+    """
+    Retrieve latest validated KJPL MJDTA record.
+    Reads from database first; CSV fallback is strictly prohibited in production.
+    """
+    try:
+        db_val = _get_latest_kjpl_from_db()
+        if db_val is not None:
+            return db_val
+    except Exception:
+        if ENVIRONMENT == "production":
+            return None
+
+    if ENVIRONMENT == "production" or not KJPL_CSV.exists():
         return None
 
     with KJPL_CSV.open("r", encoding="utf-8") as f:
@@ -138,25 +241,24 @@ def get_latest_kjpl_from_csv() -> dict[str, Any] | None:
 
         latest = reader[-1]
         prev = reader[-2] if len(reader) > 1 else None
-
         gold = float(latest["gold_mjdta"])
-        silver = float(latest["silver_mjdta"]) if latest.get("silver_mjdta") else 220.0
+        silver = float(latest["silver_mjdta"]) if latest.get("silver_mjdta") else None
         obs_time = datetime.fromisoformat(latest["observed_at"])
         pub_time = latest.get("published_time", "N/A")
 
-        # 24h / previous change
         prev_gold = float(prev["gold_mjdta"]) if prev else gold
         change_inr = round(gold - prev_gold, 2)
         change_pct = round((change_inr / prev_gold) * 100, 2) if prev_gold > 0 else 0.0
-
-        kjpl_freshness = get_freshness_details(obs_time)
+        kjpl_freshness = get_freshness_details(obs_time, rate_type="MJDTA_BENCHMARK")
 
         return {
             "source": "KJPL (MJDTA Benchmark)",
             "gold_mjdta": gold,
             "silver_mjdta": silver,
             "published_time": pub_time,
+            "source_published_at": None,
             "observed_at": obs_time.isoformat(),
+            "last_verified_at": obs_time.isoformat(),
             "currency": "INR",
             "unit": "gram",
             "change_24h_inr": change_inr,
@@ -168,102 +270,116 @@ def get_latest_kjpl_from_csv() -> dict[str, Any] | None:
 
 
 def get_latest_market_from_csv() -> dict[str, Any] | None:
-    """Read the latest US market observation from canonical CSV."""
-    if not MARKET_CSV.exists():
-        return None
-
-    with MARKET_CSV.open("r", encoding="utf-8") as f:
-        reader = list(csv.DictReader(f))
-        if not reader:
+    """
+    Retrieve international spot & FX reference strictly from KJPL Live Type 1 feeds
+    (`KJPL_SPOT_GOLD_USD`, `KJPL_SPOT_SILVER_USD`, `KJPL_SPOT_USDINR`) stored in DB.
+    Yahoo Finance and external APIs are permanently disabled per the KJPL-only rule.
+    """
+    db = SessionLocal()
+    try:
+        rows = db.execute(
+            select(BullionLatestRate).where(
+                BullionLatestRate.product_id.in_([
+                    "KJPL_SPOT_GOLD_USD",
+                    "KJPL_SPOT_SILVER_USD",
+                    "KJPL_SPOT_USDINR",
+                ]),
+                BullionLatestRate.validation_status.in_(["VALID", "SUSPECT"]),
+            )
+        ).scalars().all()
+        by_pid = {r.product_id: r for r in rows}
+        gold_r = by_pid.get("KJPL_SPOT_GOLD_USD")
+        silver_r = by_pid.get("KJPL_SPOT_SILVER_USD")
+        fx_r = by_pid.get("KJPL_SPOT_USDINR")
+        if not (gold_r and silver_r and fx_r):
             return None
 
-        latest = reader[-1]
-        prev = reader[-2] if len(reader) > 1 else None
-
-        xau = float(latest["xauusd"])
-        xag = float(latest["xagusd"])
-        usdinr = float(latest["usdinr"])
-        obs_time = datetime.fromisoformat(latest["observed_at"])
-
-        prev_xau = float(prev["xauusd"]) if prev else xau
-        prev_usdinr = float(prev["usdinr"]) if prev else usdinr
-
-        xau_change = round(xau - prev_xau, 2)
-        xau_pct = round((xau_change / prev_xau) * 100, 2) if prev_xau > 0 else 0.0
-        usdinr_change = round(usdinr - prev_usdinr, 4)
-
-        market_freshness = get_freshness_details(obs_time)
-
+        freshness = get_freshness_details(
+            gold_r.source_published_at or gold_r.last_verified_at,
+            rate_type="KJPL_LIVE",
+        )
         return {
-            "xauusd": xau,
-            "xagusd": xag,
-            "usdinr": usdinr,
-            "observed_at": obs_time.isoformat(),
-            "source": "Yahoo Finance (COMEX & Forex)",
-            "xauusd_change_24h": xau_change,
-            "xauusd_change_24h_pct": xau_pct,
-            "usdinr_change_24h": usdinr_change,
-            "freshness": market_freshness["status"],
-            "age_hours": market_freshness["age_hours"],
-            "age_display": market_freshness["age_display"],
+            "xauusd": float(gold_r.latest_price),
+            "xagusd": float(silver_r.latest_price),
+            "usdinr": float(fx_r.latest_price),
+            "observed_at": gold_r.last_collected_at.isoformat(),
+            "source_published_at": gold_r.source_published_at.isoformat() if gold_r.source_published_at else None,
+            "source": "KJPL Live Feed (SPOT-GOLD / SPOT-SILVER / SPOT-INR)",
+            "xauusd_change_24h": float(gold_r.change_inr),
+            "xauusd_change_24h_pct": float(gold_r.change_pct),
+            "usdinr_change_24h": float(fx_r.change_inr),
+            "freshness": freshness["status"],
+            "age_hours": freshness["age_hours"],
+            "age_display": freshness["age_display"],
         }
+    except Exception:
+        return None
+    finally:
+        db.close()
 
 
 def get_market_overview() -> dict[str, Any]:
     """
-    Unified real-time market overview combining domestic Indian bullion and
-    international futures, computing exact conversion and premiums.
+    Consolidated market overview sourced strictly from KJPL data in database.
+    Reports explicit unavailable/degraded state when DB or KJPL feeds are absent.
     """
+    db_health = check_database_health()
+    if not db_health.get("connected"):
+        return {
+            "status": "DEGRADED",
+            "message": "Database unavailable. Cannot serve verified live bullion overview.",
+            "database": db_health,
+        }
+
     kjpl = get_latest_kjpl_from_csv()
     market = get_latest_market_from_csv()
 
-    if not kjpl or not market:
+    if not kjpl:
         return {
-            "status": "ERROR",
-            "message": "Market data files are not accessible or empty.",
+            "status": "UNAVAILABLE",
+            "message": "Verified KJPL MJDTA rates are not yet populated in the database.",
+            "trading_status": get_market_trading_status(),
         }
 
-    xau = market["xauusd"]
-    usdinr = market["usdinr"]
-    xag = market["xagusd"]
-    kjpl_gold = kjpl["gold_mjdta"]
-    kjpl_silver = kjpl["silver_mjdta"]
+    derived: dict[str, Any] = {
+        "conversion_factor": TROY_OUNCE_GRAMS,
+        "domestic_gold_silver_ratio": (
+            round(kjpl["gold_mjdta"] / kjpl["silver_mjdta"], 2)
+            if kjpl.get("silver_mjdta") and kjpl["silver_mjdta"] > 0
+            else None
+        ),
+    }
 
-    # Converted international gold rate in INR per gram:
-    # (XAUUSD * USDINR) / 31.1034768
-    global_gold_inr_per_gram = round((xau * usdinr) / TROY_OUNCE_GRAMS, 2)
-    global_silver_inr_per_gram = round((xag * usdinr) / TROY_OUNCE_GRAMS, 2)
-
-    # Domestic premium (KJPL vs International converted price)
-    domestic_premium_inr = round(kjpl_gold - global_gold_inr_per_gram, 2)
-    domestic_premium_pct = round((domestic_premium_inr / global_gold_inr_per_gram) * 100, 2)
-
-    # Gold / Silver ratios
-    global_gold_silver_ratio = round(xau / xag, 2) if xag > 0 else 0.0
-    domestic_gold_silver_ratio = round(kjpl_gold / kjpl_silver, 2) if kjpl_silver > 0 else 0.0
-
-    # Overall freshness requires BOTH domestic bullion and global futures to be fresh
-    if kjpl["freshness"] == "STALE" or market["freshness"] == "STALE":
-        overall_freshness = "STALE"
-    elif kjpl["freshness"] == "DELAYED" or market["freshness"] == "DELAYED":
-        overall_freshness = "DELAYED"
+    if market:
+        xau = market["xauusd"]
+        usdinr = market["usdinr"]
+        xag = market["xagusd"]
+        global_gold_inr = round((xau * usdinr) / TROY_OUNCE_GRAMS, 2)
+        global_silver_inr = round((xag * usdinr) / TROY_OUNCE_GRAMS, 2)
+        premium_inr = round(kjpl["gold_mjdta"] - global_gold_inr, 2)
+        premium_pct = round((premium_inr / global_gold_inr) * 100, 2) if global_gold_inr > 0 else None
+        derived.update({
+            "global_gold_inr_per_gram": global_gold_inr,
+            "global_silver_inr_per_gram": global_silver_inr,
+            "domestic_premium_inr_per_gram": premium_inr,
+            "domestic_premium_pct": premium_pct,
+            "global_gold_silver_ratio": round(xau / xag, 2) if xag > 0 else None,
+        })
+        if kjpl["freshness"] == "STALE" or market["freshness"] == "STALE":
+            overall_freshness = "STALE"
+        elif kjpl["freshness"] == "DELAYED" or market["freshness"] == "DELAYED":
+            overall_freshness = "DELAYED"
+        else:
+            overall_freshness = "FRESH"
     else:
-        overall_freshness = "FRESH"
+        overall_freshness = kjpl["freshness"]
 
     return {
         "status": "SUCCESS",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "kjpl": kjpl,
         "market": market,
-        "derived": {
-            "global_gold_inr_per_gram": global_gold_inr_per_gram,
-            "global_silver_inr_per_gram": global_silver_inr_per_gram,
-            "domestic_premium_inr_per_gram": domestic_premium_inr,
-            "domestic_premium_pct": domestic_premium_pct,
-            "global_gold_silver_ratio": global_gold_silver_ratio,
-            "domestic_gold_silver_ratio": domestic_gold_silver_ratio,
-            "conversion_factor": TROY_OUNCE_GRAMS,
-        },
+        "derived": derived,
         "overall_freshness": overall_freshness,
         "trading_status": get_market_trading_status(),
     }
@@ -271,70 +387,13 @@ def get_market_overview() -> dict[str, Any]:
 
 def refresh_market_data() -> dict[str, Any]:
     """
-    Attempt an active market refresh if cooldown period has passed.
-    Never overwrites data or creates duplicates.
+    Manual refresh endpoint stub: returns latest verified KJPL database snapshot.
+    External Yahoo Finance scraping is prohibited; dedicated Oracle/GitHub workers write KJPL feeds.
     """
-    global LAST_REFRESH_TIME
-    now = time.time()
-    elapsed = now - LAST_REFRESH_TIME
-
-    if elapsed < REFRESH_COOLDOWN_SECONDS:
-        remaining = int(REFRESH_COOLDOWN_SECONDS - elapsed)
-        overview = get_market_overview()
-        overview["message"] = f"Refresh rate limited. Retaining latest observations (cooldown: {remaining}s remaining)."
-        overview["refreshed"] = False
-        return overview
-
-    # Attempt fetch
-    try:
-        import yfinance as yf
-        tickers = {
-            "USDINR": "USDINR=X",
-            "XAUUSD": "GC=F",
-            "XAGUSD": "SI=F",
-        }
-        latest_vals = {}
-        for name, sym in tickers.items():
-            t = yf.Ticker(sym)
-            hist = t.history(period="1d", interval="15m")
-            if not hist.empty:
-                latest_vals[name] = float(hist["Close"].dropna().iloc[-1])
-
-        if len(latest_vals) == 3:
-            obs_at = datetime.now(IST)
-            # Append only if values differ or significant time elapsed (> 30 min)
-            market_curr = get_latest_market_from_csv()
-            should_append = True
-            if market_curr:
-                last_time = datetime.fromisoformat(market_curr["observed_at"])
-                if (datetime.now(timezone.utc) - last_time.astimezone(timezone.utc)).total_seconds() < 1800:
-                    if (
-                        market_curr["xauusd"] == latest_vals["XAUUSD"]
-                        and market_curr["usdinr"] == latest_vals["USDINR"]
-                    ):
-                        should_append = False
-
-            if should_append:
-                MARKET_CSV.parent.mkdir(parents=True, exist_ok=True)
-                with MARKET_CSV.open("a", newline="", encoding="utf-8") as f:
-                    w = csv.DictWriter(f, fieldnames=["observed_at", "usdinr", "xauusd", "xagusd", "source"])
-                    w.writerow({
-                        "observed_at": obs_at.isoformat(),
-                        "usdinr": latest_vals["USDINR"],
-                        "xauusd": latest_vals["XAUUSD"],
-                        "xagusd": latest_vals["XAGUSD"],
-                        "source": "Yahoo Finance",
-                    })
-
-        LAST_REFRESH_TIME = time.time()
-        overview = get_market_overview()
-        overview["message"] = "Market data successfully refreshed."
-        overview["refreshed"] = True
-        return overview
-
-    except Exception as e:
-        LAST_REFRESH_TIME = time.time()
-        overview = get_market_overview()
-        overview["message"] = f"Refresh attempt encountered provider error: {str(e)}. Retaining last-known-good observation."
-        overview["refreshed"] = False
-        return overview
+    overview = get_market_overview()
+    overview["refreshed"] = False
+    overview["message"] = (
+        "VMD Bullion runs dedicated KJPL-only collectors (single-writer model). "
+        "Returning latest verified KJPL observations from database."
+    )
+    return overview

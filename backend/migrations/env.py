@@ -18,10 +18,15 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
+import os
+
 from app.db.base import Base
-from app.db.session import engine as app_engine
+import app.db.session as _dbs
 import app.models  # Load all models
 target_metadata = Base.metadata
+
+# Fixed 64-bit key for the migration advisory lock ("VMDMIGR" as hex-ish constant).
+MIGRATION_ADVISORY_LOCK_KEY = 0x564D444D494752
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -60,14 +65,25 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = app_engine
+    migration_url = os.environ.get("MIGRATION_DATABASE_URL")
+    if migration_url and migration_url.strip():
+        connectable = _dbs.build_engine(url=migration_url.strip(), use_nullpool=True)
+    else:
+        connectable = _dbs.engine
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            render_as_batch=(connection.dialect.name == "sqlite"),
+            compare_type=True,
         )
 
         with context.begin_transaction():
+            if connection.dialect.name == "postgresql":
+                # A3-8: serialize concurrent `alembic upgrade` runs (KJPL and news workflows use
+                # different concurrency groups). Transaction-scoped: released on commit/rollback.
+                connection.exec_driver_sql(f"SELECT pg_advisory_xact_lock({MIGRATION_ADVISORY_LOCK_KEY})")
             context.run_migrations()
 
 

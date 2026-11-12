@@ -21,7 +21,7 @@ class AlertService:
                     "id": r.id,
                     "alert_type": r.alert_type,
                     "target_metric": r.target_metric,
-                    "threshold": r.threshold,
+                    "threshold": float(r.threshold),
                     "is_active": r.is_active,
                     "last_triggered_at": r.last_triggered_at.isoformat() if r.last_triggered_at else None,
                     "notes": r.notes,
@@ -79,10 +79,9 @@ class AlertService:
             return []
 
         kjpl_gold = overview["kjpl"]["gold_mjdta"]
-        kjpl_silver = overview["kjpl"]["silver_mjdta"]
-        us_gold = overview["market"]["xauusd"]
-        premium_pct = overview["derived"]["domestic_premium_pct"]
-        daily_change = abs(overview["kjpl"]["change_24h_pct"])
+        us_gold = (overview.get("market") or {}).get("xauusd")
+        premium_pct = (overview.get("derived") or {}).get("domestic_premium_pct")
+        daily_change = abs(overview["kjpl"].get("change_24h_pct") or 0.0)
 
         notifications = []
         for r in rules:
@@ -91,21 +90,21 @@ class AlertService:
 
             triggered = False
             message = ""
-            current_val = 0.0
+            current_val: float | None = None
 
             if r["alert_type"] == "PRICE_ABOVE":
                 current_val = kjpl_gold if r["target_metric"] == "KJPL_GOLD" else us_gold
-                if current_val >= r["threshold"]:
+                if current_val is not None and current_val >= r["threshold"]:
                     triggered = True
                     message = f"{r['target_metric']} crossed above ₹{r['threshold']:,.0f} (Current: ₹{current_val:,.0f})"
             elif r["alert_type"] == "PRICE_BELOW":
                 current_val = kjpl_gold if r["target_metric"] == "KJPL_GOLD" else us_gold
-                if current_val <= r["threshold"]:
+                if current_val is not None and current_val <= r["threshold"]:
                     triggered = True
                     message = f"{r['target_metric']} crossed below ₹{r['threshold']:,.0f} (Current: ₹{current_val:,.0f})"
             elif r["alert_type"] == "PREMIUM_ABOVE":
                 current_val = premium_pct
-                if current_val >= r["threshold"]:
+                if current_val is not None and current_val >= r["threshold"]:
                     triggered = True
                     message = f"Domestic premium crossed above {r['threshold']}% (Current: {current_val}%)"
             elif r["alert_type"] == "DAILY_CHANGE_PCT":

@@ -12,3 +12,13 @@ from app.models.bullion import (
     CollectorRun,
     DataSourceStatus,
 )
+from app.models.research import (
+    NewsCollectionRun,
+    NewsCluster,
+    NewsArticleRecord,
+    NewsLabelRecord,
+    ResearchFeatureSnapshot,
+    ForecastRun,
+    ForecastEvaluation,
+    ForecastEvaluationReassessment,
+)

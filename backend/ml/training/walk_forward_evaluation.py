@@ -28,7 +28,7 @@ FEATURE_COLUMNS = [
 ]
 
 
-def run_walk_forward_evaluation() -> dict:
+def run_walk_forward_evaluation(report_path: Path | None = REPORT_PATH) -> dict:
     """
     Executes walk-forward chronological evaluation and benchmarks baseline models.
     Enforces point-in-time discipline with strictly zero lookahead leakage.
@@ -106,9 +106,10 @@ def run_walk_forward_evaluation() -> dict:
         ),
     }
 
-    REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with REPORT_PATH.open("w", encoding="utf-8") as f:
-        json.dump(report, f, indent=2)
+    if report_path is not None:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        with report_path.open("w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2)
 
     return report
 

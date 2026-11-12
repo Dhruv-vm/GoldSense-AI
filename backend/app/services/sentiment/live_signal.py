@@ -149,7 +149,7 @@ def get_live_news_intelligence(
 
     total_fresh_scanned = len(raw_candidates)
 
-    # Filter for gold relevance and evaluate directional impact
+    # Filter for gold relevance and evaluate directional impact (keep UI clusters intact; exclude price wraps from directional consensus)
     relevant_evaluated: list[dict[str, Any]] = []
     for art in raw_candidates:
         impact = evaluate_gold_impact(
@@ -208,7 +208,7 @@ def get_live_news_intelligence(
 
     # Market movement alignment comparison
     market_overview = get_market_overview()
-    market = market_overview.get("market", {})
+    market = market_overview.get("market") or {}
     xauusd_change_pct = market.get("xauusd_change_24h_pct", 0.0) or 0.0
 
     # Insufficient fresh news guard (< 2 distinct relevant clusters)

@@ -10,17 +10,14 @@ from app.models.portfolio import PortfolioHolding
 from app.services.data_service import get_latest_kjpl_from_csv, init_database
 
 
-def get_current_benchmark_rates() -> tuple[float, float]:
-    """Retrieve current gold and silver benchmark rates in INR per gram."""
+def get_current_benchmark_rates() -> tuple[float | None, float | None]:
+    """Retrieve current verified KJPL gold and silver benchmark rates in INR per gram (None if unavailable)."""
     kjpl = get_latest_kjpl_from_csv()
     if kjpl:
-        gold_rate = float(kjpl["gold_mjdta"])
-        silver_rate = float(kjpl["silver_mjdta"])
-    else:
-        # Fallback conservative benchmarks
-        gold_rate = 13135.0
-        silver_rate = 220.0
-    return gold_rate, silver_rate
+        gold_rate = float(kjpl["gold_mjdta"]) if kjpl.get("gold_mjdta") is not None else None
+        silver_rate = float(kjpl["silver_mjdta"]) if kjpl.get("silver_mjdta") is not None else None
+        return gold_rate, silver_rate
+    return None, None
 
 
 class PortfolioService:
@@ -40,18 +37,23 @@ class PortfolioService:
             results = []
             for h in holdings:
                 metal = h.metal_type.upper()
+                purity_f = float(h.purity)
+                gross_f = float(h.gross_weight_grams)
+                fine_f = float(h.fine_weight_grams)
+                acq_cost_f = float(h.acquisition_cost_inr) if h.acquisition_cost_inr is not None else None
                 rate_per_gram = gold_rate if metal == "GOLD" else silver_rate
 
-                # Reconciled benchmark valuation:
-                # Rate is quoted for 0.999 benchmark purity.
-                # Valuation = Gross Weight * Rate * (Purity / 0.999) * Quantity
                 benchmark_purity = 0.999
-                current_valuation = round(h.gross_weight_grams * (h.purity / benchmark_purity) * rate_per_gram * h.quantity, 2)
+                current_valuation = (
+                    round(gross_f * (purity_f / benchmark_purity) * rate_per_gram * h.quantity, 2)
+                    if rate_per_gram is not None
+                    else 0.0
+                )
 
                 gain_loss_inr = None
                 gain_loss_pct = None
-                if h.acquisition_cost_inr is not None and h.acquisition_cost_inr > 0:
-                    total_cost = h.acquisition_cost_inr * h.quantity
+                if acq_cost_f is not None and acq_cost_f > 0 and rate_per_gram is not None:
+                    total_cost = acq_cost_f * h.quantity
                     gain_loss_inr = round(current_valuation - total_cost, 2)
                     gain_loss_pct = round((gain_loss_inr / total_cost) * 100, 2)
 
@@ -59,14 +61,15 @@ class PortfolioService:
                     "id": h.id,
                     "metal_type": h.metal_type,
                     "product_name": h.product_name,
-                    "purity": h.purity,
-                    "gross_weight_grams": h.gross_weight_grams,
-                    "fine_weight_grams": h.fine_weight_grams,
-                    "fine_weight_kg": round(h.fine_weight_grams / 1000.0, 4),
+                    "purity": purity_f,
+                    "gross_weight_grams": gross_f,
+                    "fine_weight_grams": fine_f,
+                    "fine_weight_kg": round(fine_f / 1000.0, 4),
                     "quantity": h.quantity,
                     "acquisition_date": h.acquisition_date,
-                    "acquisition_cost_inr": h.acquisition_cost_inr,
+                    "acquisition_cost_inr": acq_cost_f,
                     "current_valuation_inr": current_valuation,
+                    "valuation_available": rate_per_gram is not None,
                     "unrealized_gain_loss_inr": gain_loss_inr,
                     "unrealized_gain_loss_pct": gain_loss_pct,
                     "notes": h.notes,
@@ -164,7 +167,7 @@ class PortfolioService:
                     holding.gross_weight_grams = gross_grams
 
             # Recalculate fine weight
-            holding.fine_weight_grams = round(holding.gross_weight_grams * holding.purity, 4)
+            holding.fine_weight_grams = round(float(holding.gross_weight_grams) * float(holding.purity), 4)
 
             if "quantity" in data:
                 q = int(data["quantity"])
@@ -218,7 +221,7 @@ class PortfolioService:
         for row in kjpl_records:
             try:
                 gold_rate = float(row["gold_mjdta"])
-                silver_rate = float(row.get("silver_mjdta", 0.0)) if row.get("silver_mjdta") else 220.0
+                silver_rate = float(row["silver_mjdta"]) if row.get("silver_mjdta") else None
                 obs_date = row.get("observed_at", "")[:10]
 
                 total_val = 0.0
@@ -231,10 +234,11 @@ class PortfolioService:
                     if h["metal_type"] == "GOLD":
                         val = round(h["gross_weight_grams"] * (h["purity"] / benchmark_purity) * gold_rate * qty, 2)
                         gold_val += val
-                    else:
+                        total_val += val
+                    elif silver_rate is not None:
                         val = round(h["gross_weight_grams"] * (h["purity"] / benchmark_purity) * silver_rate * qty, 2)
                         silver_val += val
-                    total_val += val
+                        total_val += val
 
                 history.append({
                     "date": obs_date,
