@@ -1,0 +1,251 @@
+sample_id,story_cluster_id,pred_general_tone,pred_gold_impact,pred_driver,pred_surprise,pred_is_price_report,pred_confidence,pred_rationale,stratum_weight
+rev_0001,clu2_ee42ff66255333eb,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0002,clu2_9a2635937afa7232,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0003,clu2_9cc0ec15c2b9b230,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0004,clu2_26db3370a4d8c383,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0005,clu2_9ab60e9a56333f83,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0006,clu2_9149afb9bc015695,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0007,clu2_3f6d7af956e2d848,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0008,clu2_a66c41817599cf1d,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0009,clu2_9612c1be0ade06f8,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0010,clu2_58f3592dffc1b4df,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0011,clu2_af8a5aec9fc66f23,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0012,clu2_9d0e53eee55f0171,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0013,clu2_3131a4326c1709b0,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0014,clu2_27635a07410ee095,UNKNOWN,BEARISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0015,clu2_df1b73f925c0dd3f,UNKNOWN,BULLISH,FED_POLICY,DOVISH_SURPRISE,False,HIGH,Cooling rate-hike expectations or softer inflation reduce real-yield headwinds on gold.,0.372545
+rev_0016,clu2_e55a014ed6973c0a,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Cooling rate-hike expectations or softer inflation reduce real-yield headwinds on gold.,0.372545
+rev_0017,clu2_a3bb8d52ce9cc510,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Cooling rate-hike expectations or softer inflation reduce real-yield headwinds on gold.,0.372545
+rev_0018,clu2_4d2be2a35137bba6,UNKNOWN,BULLISH,FED_POLICY,DOVISH_SURPRISE,False,HIGH,Cooling rate-hike expectations or softer inflation reduce real-yield headwinds on gold.,0.372545
+rev_0019,clu2_5bde25e005e486e6,UNKNOWN,MIXED,FED_POLICY,DOVISH_SURPRISE,False,MEDIUM,Conflicting bullish (FED_POLICY) and bearish (US_INTEREST_RATES) bullion drivers: Cooling rate-hike expectations or softer inflation reduce real-yield headwinds on gold.,0.116768
+rev_0020,clu2_c9b7e340c74e4473,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0021,clu2_6d4a803887576afd,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0022,clu2_97279f0bef9d7cf9,UNKNOWN,MIXED,FED_POLICY,UNKNOWN,False,MEDIUM,Conflicting bullish (FED_POLICY) and bearish (US_INTEREST_RATES) bullion drivers: Cooling rate-hike expectations or softer inflation reduce real-yield headwinds on gold.,0.116768
+rev_0023,clu2_2d2350f87f68c7e6,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0024,clu2_e5920b29b617a89d,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0025,clu2_18e9f3238b01115c,UNKNOWN,BULLISH,FED_POLICY,DOVISH_SURPRISE,False,HIGH,Cooling rate-hike expectations or softer inflation reduce real-yield headwinds on gold.,0.372545
+rev_0026,clu2_eb959f358bb8dc52,UNKNOWN,MIXED,FED_POLICY,DOVISH_SURPRISE,False,MEDIUM,Conflicting bullish (FED_POLICY) and bearish (FED_POLICY) bullion drivers: Cooling rate-hike expectations or softer inflation reduce real-yield headwinds on gold.,0.116768
+rev_0027,clu2_de1c4399010c3fb0,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0028,clu2_73d5bb115ecbe479,UNKNOWN,BEARISH,USD,UNKNOWN,False,HIGH,A stronger US Dollar increases the acquisition cost of dollar-denominated bullion.,0.193985
+rev_0029,clu2_db97dad7de3a109b,UNKNOWN,BULLISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.372545
+rev_0030,clu2_634fc599bb2bdf59,UNKNOWN,BEARISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0031,clu2_4bd093de7ea0bb78,UNKNOWN,BULLISH,FED_POLICY,DOVISH_SURPRISE,False,HIGH,Cooling rate-hike expectations or softer inflation reduce real-yield headwinds on gold.,0.372545
+rev_0032,clu2_0b44ff6a20b5373e,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0033,clu2_a223c19a653e11e3,UNKNOWN,BEARISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0034,clu2_e048fd05bd118f64,UNKNOWN,BEARISH,USD,UNKNOWN,False,HIGH,A stronger US Dollar increases the acquisition cost of dollar-denominated bullion.,0.193985
+rev_0035,clu2_b6f2087d864951e9,UNKNOWN,BEARISH,CENTRAL_BANKS,UNKNOWN,False,HIGH,Central bank gold reserve sales or paused purchases weigh on physical demand.,0.193985
+rev_0036,clu2_adf66ea672a5bd9a,UNKNOWN,BEARISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0037,clu2_e410c90deebaa19f,UNKNOWN,BEARISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0038,clu2_a6521f85dd0d4682,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0039,clu2_b183f2519467c856,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0040,clu2_9b79f6fb937ccd62,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0041,clu2_ef7cd8587462a4da,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0042,clu2_828a32f8e45fe2c4,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0043,clu2_06348f53d478d3c5,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0044,clu2_b58f1b62b88c145b,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0045,clu2_626687b3ed5a2500,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0046,clu2_fdf4b08a182c9a00,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0047,clu2_f1bda43652796a3f,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0048,clu2_8e9d639ea5cb45be,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0049,clu2_aeda41988a8a1d86,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0050,clu2_a68d3545cbc7c870,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0051,clu2_d6ee00e65178091a,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0052,clu2_1bf18b6f2e39c2f0,UNKNOWN,BULLISH,CENTRAL_BANKS,UNKNOWN,False,HIGH,Sovereign central bank reserve buying adds physical structural demand.,0.372545
+rev_0053,clu2_f4d3bc607d6c629a,UNKNOWN,BEARISH,USD,UNKNOWN,False,HIGH,A stronger US Dollar increases the acquisition cost of dollar-denominated bullion.,0.193985
+rev_0054,clu2_f94cccf741a26613,UNKNOWN,BEARISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0055,clu2_7f957dd4bc5680f6,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0056,clu2_eac261c5ae7c7c0b,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0057,clu2_f03d8084b388426b,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0058,clu2_388444410375bb48,UNKNOWN,BEARISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0059,clu2_952f2beff85a3c73,UNKNOWN,BULLISH,CENTRAL_BANKS,UNKNOWN,False,HIGH,Sovereign central bank reserve buying adds physical structural demand.,0.372545
+rev_0060,clu2_cc1f235e0c83398b,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Cooling rate-hike expectations or softer inflation reduce real-yield headwinds on gold.,0.372545
+rev_0061,clu2_1276d9d9bb965320,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0062,clu2_8bca127bd5b4b39d,UNKNOWN,BULLISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.372545
+rev_0063,clu2_089ec4843049a50b,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0064,clu2_eb20b6de695d61f6,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0065,clu2_549c1dd33028f44a,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,Pushback against rate cuts sustains restrictive opportunity-cost pressure on non-yielding gold.,0.193985
+rev_0066,clu2_86a6a19459dc5222,UNKNOWN,BEARISH,USD,UNKNOWN,False,HIGH,A stronger US Dollar increases the acquisition cost of dollar-denominated bullion.,0.193985
+rev_0067,clu2_db1a5eaa161732f7,UNKNOWN,BEARISH,USD,UNKNOWN,False,HIGH,A stronger US Dollar increases the acquisition cost of dollar-denominated bullion.,0.193985
+rev_0068,clu2_a0b2b891d53065c8,UNKNOWN,BEARISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0069,clu2_32366ad9bd23e5cb,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0070,clu2_19f40f5b788e5a44,UNKNOWN,BEARISH,USD,UNKNOWN,False,HIGH,A stronger US Dollar increases the acquisition cost of dollar-denominated bullion.,0.193985
+rev_0071,clu2_c3c9add738fb209b,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.372545
+rev_0072,clu2_233360f7aa8f756e,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.372545
+rev_0073,clu2_e2461542fd0cebe8,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0074,clu2_1cea73a89c166350,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0075,clu2_dd3036a62b426b56,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0076,clu2_47c32188d2cf69b4,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0077,clu2_3f1e9a1ffa2fa334,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0078,clu2_6ca68f2d604708db,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0079,clu2_5aecbf4597b95b79,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0080,clu2_7c7f21af0ba4af1d,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0081,clu2_a4eec3b740631dd6,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0082,clu2_d6bc960ce4773947,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0083,clu2_471d67d967453949,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0084,clu2_0d5991669eda2ce2,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0085,clu2_f2428057d465c293,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0086,clu2_39b906d2b5b1a559,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0087,clu2_276df9b6a69a7e91,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0088,clu2_ab0cc8be5724ed24,UNKNOWN,BEARISH,USD,UNKNOWN,False,HIGH,A stronger US Dollar increases the acquisition cost of dollar-denominated bullion.,0.193985
+rev_0089,clu2_6f2348bf2df0a1cb,UNKNOWN,BULLISH,CENTRAL_BANKS,UNKNOWN,False,HIGH,Sovereign central bank reserve buying adds physical structural demand.,0.372545
+rev_0090,clu2_4ab52b0eab181f30,UNKNOWN,BEARISH,INFLATION,UNKNOWN,False,MEDIUM,Energy/CPI inflation shock strengthens higher-for-longer yield expectations.,0.193985
+rev_0091,clu2_cb5a534ff188efc3,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0092,clu2_5d80606e681652f5,UNKNOWN,BULLISH,CENTRAL_BANKS,UNKNOWN,False,HIGH,Sovereign central bank reserve buying adds physical structural demand.,0.372545
+rev_0093,clu2_ac659429805fbeb0,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0094,clu2_5414dc180c6b8555,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0095,clu2_ff160acb60f75e98,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0096,clu2_02881b8b98780346,UNKNOWN,BEARISH,INFLATION,UNKNOWN,False,MEDIUM,Energy/CPI inflation shock strengthens higher-for-longer yield expectations.,0.193985
+rev_0097,clu2_f2233e74212a7953,UNKNOWN,BEARISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0098,clu2_dda438648e8bc992,UNKNOWN,BEARISH,INFLATION,UNKNOWN,False,MEDIUM,Energy/CPI inflation shock strengthens higher-for-longer yield expectations.,0.193985
+rev_0099,clu2_3fa27fd89f75694d,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.372545
+rev_0100,clu2_945cdcdd0c0b9c29,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0101,clu2_0fac23fa66dd600d,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0102,clu2_e90b32197e4c7c74,UNKNOWN,BEARISH,USD,UNKNOWN,False,HIGH,A stronger US Dollar increases the acquisition cost of dollar-denominated bullion.,0.193985
+rev_0103,clu2_5f77036e67244a43,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0104,clu2_40fbb16a353a97be,UNKNOWN,BULLISH,USD,UNKNOWN,False,MEDIUM,Dollar weakness lowers global acquisition cost for bullion buyers.,0.372545
+rev_0105,clu2_53c406f496f21b34,UNKNOWN,BULLISH,CENTRAL_BANKS,UNKNOWN,False,HIGH,Sovereign central bank reserve buying adds physical structural demand.,0.372545
+rev_0106,clu2_e59b70be4a558ade,UNKNOWN,BULLISH,CENTRAL_BANKS,UNKNOWN,False,HIGH,Sovereign central bank reserve buying adds physical structural demand.,0.372545
+rev_0107,clu2_380273c419404e38,UNKNOWN,BULLISH,USD,UNKNOWN,False,MEDIUM,Dollar weakness lowers global acquisition cost for bullion buyers.,0.372545
+rev_0108,clu2_a10259ad1a72b1f1,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0109,clu2_5744b395966952da,UNKNOWN,UNKNOWN,INFLATION,UNKNOWN,False,LOW,Inflation headline lacks unambiguous hawkish vs stagflationary net direction.,3.279926
+rev_0110,clu2_03f1c225cc8980b3,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0111,clu2_a3bc12223eec0dcc,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0112,clu2_ee95a9722bed64d0,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0113,clu2_16d68de4664dc112,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0114,clu2_24829147d3a47e9c,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0115,clu2_c9fb0a25f7cba24c,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0116,clu2_e1e037a21c659657,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0117,clu2_a8983a27bcdd73da,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0118,clu2_c6657f1e1e3c977d,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0119,clu2_c84a3b449801aeb6,UNKNOWN,UNKNOWN,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,LOW,Physical sector commentary lacks clear directional evidence.,3.279926
+rev_0120,clu2_bbbeade67353e55b,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0121,clu2_77ccabe224d8f79a,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0122,clu2_102d62a114ae8721,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0123,clu2_f323eb3c6194db4d,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0124,clu2_6020bb017f20fca4,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0125,clu2_1715865e124db17c,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0126,clu2_90b6914c149fa251,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0127,clu2_9a24026f1822f659,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0128,clu2_092a86deec248576,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0129,clu2_c8d72887eb8d6e55,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0130,clu2_aa2e8d672e9b50a1,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0131,clu2_94bce4ee0959d4d4,UNKNOWN,BEARISH,INFLATION,UNKNOWN,False,MEDIUM,Energy/CPI inflation shock strengthens higher-for-longer yield expectations.,0.193985
+rev_0132,clu2_4a1da712d7b5e5e8,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0133,clu2_98770e584b664f81,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0134,clu2_359ff83909805cc9,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0135,clu2_4efcc052d10338a3,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0136,clu2_9ae89284b7227b45,UNKNOWN,BULLISH,CENTRAL_BANKS,UNKNOWN,False,HIGH,Sovereign central bank reserve buying adds physical structural demand.,0.372545
+rev_0137,clu2_ab9ff3d12ede4d53,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0138,clu2_32bb8f3b7b165dfe,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0139,clu2_f67188abbc737da3,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0140,clu2_4940df519fbff1ee,UNKNOWN,BEARISH,INFLATION,UNKNOWN,False,MEDIUM,Energy/CPI inflation shock strengthens higher-for-longer yield expectations.,0.193985
+rev_0141,clu2_496338eaa4accd6e,UNKNOWN,BEARISH,CENTRAL_BANKS,UNKNOWN,False,HIGH,Central bank gold reserve sales or paused purchases weigh on physical demand.,0.193985
+rev_0142,clu2_64ec67c4424a97b2,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0143,clu2_e618d0336ea0a2e3,UNKNOWN,MIXED,GEOPOLITICS,UNKNOWN,False,MEDIUM,Conflicting bullish (GEOPOLITICS) and bearish (INFLATION) bullion drivers: Geopolitical conflict or safe-haven demand supports gold inflows.,0.116768
+rev_0144,clu2_5eea31ae70c046e8,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0145,clu2_eb8e8b788c529fa1,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0146,clu2_d172ddab6685543b,UNKNOWN,UNKNOWN,INFLATION,UNKNOWN,False,LOW,Inflation headline lacks unambiguous hawkish vs stagflationary net direction.,3.279926
+rev_0147,clu2_26c9571777b98b49,UNKNOWN,UNKNOWN,FED_POLICY,UNKNOWN,False,LOW,Federal Reserve preview/commentary lacks a realized hawkish or dovish surprise.,3.279926
+rev_0148,clu2_95c2b7e8bea4fc05,UNKNOWN,UNKNOWN,INFLATION,UNKNOWN,False,LOW,Inflation headline lacks unambiguous hawkish vs stagflationary net direction.,3.279926
+rev_0149,clu2_31ab706274444af0,UNKNOWN,UNKNOWN,INFLATION,UNKNOWN,False,LOW,Inflation headline lacks unambiguous hawkish vs stagflationary net direction.,3.279926
+rev_0150,clu2_21a5f52c37b0a01b,UNKNOWN,UNKNOWN,FED_POLICY,UNKNOWN,False,LOW,Federal Reserve preview/commentary lacks a realized hawkish or dovish surprise.,3.279926
+rev_0151,clu2_c32f0de4f8e13fca,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0152,clu2_7cd52a16b38c76b7,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0153,clu2_cf8e082c9067046a,UNKNOWN,BULLISH,OTHER_MACRO,UNKNOWN,False,MEDIUM,Technical breakout or record momentum attracts trend buyers.,0.372545
+rev_0154,clu2_547a5ed78cc159cf,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.372545
+rev_0155,clu2_0dd60cbf3706aae0,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0156,clu2_41b212f46a15536c,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0157,clu2_ada753c297695bb6,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.372545
+rev_0158,clu2_ebabf75fef44289d,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0159,clu2_997d475132e34983,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0160,clu2_416e7700181995cf,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0161,clu2_e0744147e0e5d9a8,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0162,clu2_7b8b882af4916404,UNKNOWN,BEARISH,USD,UNKNOWN,False,HIGH,A stronger US Dollar increases the acquisition cost of dollar-denominated bullion.,0.193985
+rev_0163,clu2_7af106fe68805f37,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0164,clu2_2fad63da15a4fd9b,UNKNOWN,BEARISH,USD,UNKNOWN,False,HIGH,A stronger US Dollar increases the acquisition cost of dollar-denominated bullion.,0.193985
+rev_0165,clu2_ce56f02a9a37bb6b,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0166,clu2_be501b8ab5c70566,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0167,clu2_c9eb56571f84c96a,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0168,clu2_ed7f86d11d7acf3a,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0169,clu2_540735c5f6da9808,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0170,clu2_52ac598ced66a84b,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0171,clu2_07c9b4e266495735,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0172,clu2_cc7844c309ff2191,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0173,clu2_f9e98fb77daf8387,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0174,clu2_25fe99ea52cc135c,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0175,clu2_ddf2747b31a774e0,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0176,clu2_7af74d1e3b414ad2,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0177,clu2_29570395c9f5d35f,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0178,clu2_09c005aa104f42d9,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0179,clu2_dd3db71813dab826,UNKNOWN,UNKNOWN,INFLATION,UNKNOWN,False,LOW,Inflation headline lacks unambiguous hawkish vs stagflationary net direction.,3.279926
+rev_0180,clu2_7f97bffd647fb55b,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0181,clu2_a232e65764e042a9,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0182,clu2_be5fda8ebf14b310,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0183,clu2_2b03155257b9ba0a,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0184,clu2_f8623cc84a50025d,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0185,clu2_d63eadf5f0570f87,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0186,clu2_a5edd845bf13dc45,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0187,clu2_a8a03a55604da8ae,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0188,clu2_7ccebd508f0a2180,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.372545
+rev_0189,clu2_90d52b3e2f007cb3,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0190,clu2_e6a7b92f588fdbe4,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0191,clu2_f54ab0b1d2af9fe5,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0192,clu2_b3ead7bc465fe03d,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0193,clu2_eb49687df558cf2c,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0194,clu2_2f43dd053c7a707b,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.372545
+rev_0195,clu2_1d0d71e29a2f399e,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0196,clu2_669eaf8dca9316da,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0197,clu2_91da5153b2baec4a,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0198,clu2_5137da910ece7581,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0199,clu2_002b7996ca882d85,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0200,clu2_01f003e9fe357fe5,UNKNOWN,MIXED,FED_POLICY,UNKNOWN,False,MEDIUM,Conflicting bullish (FED_POLICY) and bearish (FED_POLICY) bullion drivers: Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.116768
+rev_0201,clu2_68af5cdb4098aa3c,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0202,clu2_3bfbf7b799b8a74a,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0203,clu2_77231263e152b323,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0204,clu2_ae8a364abac45863,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0205,clu2_8e3fd667835ac926,UNKNOWN,MIXED,FED_POLICY,UNKNOWN,False,MEDIUM,Conflicting bullish (FED_POLICY) and bearish (FED_POLICY) bullion drivers: Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.116768
+rev_0206,clu2_a1438e5fd30ac678,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0207,clu2_ab85645cd47bce6e,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0208,clu2_53cbb55aaea4adbb,UNKNOWN,BULLISH,CENTRAL_BANKS,UNKNOWN,False,HIGH,Sovereign central bank reserve buying adds physical structural demand.,0.372545
+rev_0209,clu2_da64d28bb31b7a8a,UNKNOWN,BEARISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,MEDIUM,Weak physical retail demand softens domestic bullion absorption.,0.193985
+rev_0210,clu2_85042cbd12c34240,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0211,clu2_b1fc6554f52f6e71,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0212,clu2_8f9cf6cb723a9c88,UNKNOWN,MIXED,CENTRAL_BANKS,UNKNOWN,False,MEDIUM,Conflicting bullish (CENTRAL_BANKS) and bearish (FED_POLICY) bullion drivers: Sovereign central bank reserve buying adds physical structural demand.,0.116768
+rev_0213,clu2_e54641d31a255e99,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0214,clu2_7ed1e212fff34a18,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0215,clu2_aa23c143c5e1c20a,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0216,clu2_f2e2714b198d7aec,UNKNOWN,MIXED,CENTRAL_BANKS,UNKNOWN,False,MEDIUM,Conflicting bullish (CENTRAL_BANKS) and bearish (FED_POLICY) bullion drivers: Sovereign central bank reserve buying adds physical structural demand.,0.116768
+rev_0217,clu2_98066681a1e9aeee,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0218,clu2_94f627d99b0437de,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0219,clu2_1db72ca202dd3ec7,UNKNOWN,UNKNOWN,INFLATION,UNKNOWN,False,LOW,Inflation headline lacks unambiguous hawkish vs stagflationary net direction.,3.279926
+rev_0220,clu2_1b84b04e69b77967,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0221,clu2_cd2f162d40762199,UNKNOWN,BULLISH,GEOPOLITICS,UNKNOWN,False,HIGH,Geopolitical conflict or safe-haven demand supports gold inflows.,0.372545
+rev_0222,clu2_3b251c0c8b4c9690,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0223,clu2_0d27fd4df18e0289,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0224,clu2_8ace0a1c60da3d28,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0225,clu2_10fbb5d0b0e825af,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0226,clu2_4f5e65015efb7f33,UNKNOWN,UNKNOWN,UNKNOWN,UNKNOWN,False,LOW,No unambiguous gold-specific macro or physical driver identified; impact marked UNKNOWN.,3.279926
+rev_0227,clu2_80a63d28dae3552e,UNKNOWN,BULLISH,CENTRAL_BANKS,POSITIVE_SURPRISE,False,HIGH,Sovereign central bank reserve buying adds physical structural demand.,0.372545
+rev_0228,clu2_e63f8633acb3c74e,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0229,clu2_1b2ba0a668bd8c32,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0230,clu2_975c0d3b17dd2d1f,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Cooling rate-hike expectations or softer inflation reduce real-yield headwinds on gold.,0.372545
+rev_0231,clu2_a8fde03393084c4a,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0232,clu2_ecc0917fddbd92f1,UNKNOWN,BULLISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.372545
+rev_0233,clu2_607115b8b864d97b,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0234,clu2_58e1f67f5c03d035,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0235,clu2_8d85dbce953d7229,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.372545
+rev_0236,clu2_d88ccb0c792b6708,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0237,clu2_a192a1cd59e34cf3,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0238,clu2_b7e2ecf4cf9de01f,UNKNOWN,NEUTRAL,GOLD_PRICE_REPORT,UNKNOWN,True,MEDIUM,Descriptive daily bullion rate/price recap without a forward-looking causal macro driver.,0.490042
+rev_0239,clu2_ccd150879603d866,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0240,clu2_0ee511b7c1cf79d3,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0241,clu2_040c26d7204906b6,UNKNOWN,BULLISH,FED_POLICY,UNKNOWN,False,HIGH,Fed rate cuts or falling real yields reduce the opportunity cost of holding gold.,0.372545
+rev_0242,clu2_4a95cdcc62ee7f7c,UNKNOWN,BULLISH,INDIAN_PHYSICAL_DEMAND,UNKNOWN,False,HIGH,Festive and retail physical bullion demand provides physical price support.,0.372545
+rev_0243,clu2_72418898d923dcc3,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0244,clu2_578a74b80d103271,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0245,clu2_8e6758188bbc65bc,UNKNOWN,BEARISH,US_INTEREST_RATES,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0246,clu2_ed0d5ad0445e64b1,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0247,clu2_d6eb7d1f1ad94874,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0248,clu2_b305c4a3e339cfef,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985
+rev_0249,clu2_6f724079fc0467c2,UNKNOWN,BEARISH,USD,UNKNOWN,False,HIGH,A stronger US Dollar increases the acquisition cost of dollar-denominated bullion.,0.193985
+rev_0250,clu2_fe8290c56b3923b2,UNKNOWN,BEARISH,FED_POLICY,UNKNOWN,False,HIGH,"Hawkish Fed rate expectations, rate hikes/holds, or rising Treasury yields increase the opportunity cost of holding non-yielding bullion.",0.193985

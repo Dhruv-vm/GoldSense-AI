@@ -1,6 +1,8 @@
 # Database Schema & Entity Relationships
 
-GoldSense AI uses SQLAlchemy for relational mapping, supporting PostgreSQL in containerized/production setups with automatic fallback to SQLite (`data/goldsense.db`) for local developer setups.
+VMD Bullion uses SQLAlchemy 2.0 + Alembic (head revision `a7c3e91b42d0`) targeting **Neon PostgreSQL Free Tier** (`sslmode=require`, `Numeric` decimal precision for all monetary fields) in production, with SQLite (`data/goldsense.db`) reserved strictly for local development and tests.
+
+> Core bullion tables (`bullion_cities`, `bullion_products`, `bullion_rate_observations`, `bullion_latest_rates`, `collector_runs`, `data_source_status`) carry `NUMERIC(14, 2)` / `NUMERIC(14, 4)` / `NUMERIC(12, 4)` monetary columns plus `validation_status`, `quarantine_reason`, `source_name`, `source_product_id`, `product_weight_grams`, `original_price`, `original_unit`, `normalized_price_per_gram`, and `raw_payload_reference` audit fields (see `backend/app/models/bullion.py`).
 
 ---
 

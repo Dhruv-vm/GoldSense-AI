@@ -1,13 +1,15 @@
 # API Design & Endpoint Reference
 
-All endpoints are hosted under `/api/v1` and return structured JSON responses.
+## 1. Core VMD Bullion Endpoints (`/api/bullion/*` & `/api/v1/*`)
 
----
+### `GET /api/bullion/dashboard`
+Consolidated initial bootstrap endpoint returning `summary`, `cities`, `city_rates`, `comparison`, `monitor`, and `history` in a single request.
 
-## 1. Market & Bullion Endpoints
+### `GET /api/bullion/stream`
+Real-time Server-Sent Events (`text/event-stream`) streaming verified KJPL snapshot updates (`event: snapshot`) whenever `BullionLatestRate` advances in Neon PostgreSQL, plus periodic `heartbeat` events.
 
-### `GET /api/v1/market/overview`
-Returns the consolidated market view including physical spot (KJPL), global benchmarks (Yahoo Finance), mathematical parity in INR/g, domestic premium percentage, and real-time market session status.
+### `GET /api/v1/market/overview` (Backward-Compatible Market Summary)
+Returns the consolidated market view bridging KJPL physical benchmarks (MJDTA Gold/Silver) and **KJPL exclusive spot feeds (`SPOT-GOLD`, `SPOT-SILVER`, `SPOT-INR`)**, mathematical parity in INR/g, and trading status. *(Yahoo Finance is permanently decommissioned per ADR-001.)*
 ```json
 {
   "status": "SUCCESS",

@@ -1,20 +1,19 @@
-# GoldSense AI (Develop Branch)
+# VMD Bullion (GoldSense AI — Develop Branch)
 
-**GoldSense AI** is a premium Bullion Intelligence, Personal Portfolio Tracking, and Machine Learning Gold-Price Prediction Platform. It bridges international precious metals markets (COMEX/LBMA via Yahoo Finance) and Indian physical spot bullion rates (KJPL in Ahmedabad, Gujarat) with real-time analytics, automated financial news NLP (FinBERT sentiment), price disparity metrics, and multi-user ready personal physical bullion management.
+**VMD Bullion** is a Bloomberg-inspired Indian physical bullion intelligence platform, personal vault tracker, and ML analytics terminal. It surfaces Indian physical bullion rates across five hubs (Chennai, Bengaluru, Mumbai, Coimbatore, Hyderabad), 1KG 99.99 wholesale bars, MJDTA reference prices, LBMA fixes, and global spot parity (`SPOT-GOLD`, `SPOT-SILVER`, `SPOT-INR`) sourced **exclusively from KJPL** — avoiding third-party spot APIs — alongside automated financial news intelligence and multi-user vault management.
 
 ---
 
 ## 🌟 Key Features
 
-### 1. Unified Market Overview & Live Domestic Disparity
-- **Indian Physical Bullion (KJPL Ahmedabad)**: Real-time tracking of Gold 999 (24K) and Silver 999 spot prices in INR per gram / kg.
-- **Global Benchmark Spot (USD)**: Continuous monitoring of COMEX Gold Futures (`GC=F`), Silver Futures (`SI=F`), and Foreign Exchange (`USDINR=X`).
+### 1. Unified Market Overview & KJPL Exclusive Parity
+- **Indian Physical Bullion (KJPL Live + MJDTA)**: Tracks Chennai, Bengaluru, Mumbai, Coimbatore, and Hyderabad 100g 999 gold rates, `GOLD_1KG_9999`, MJDTA Gold/Silver references, and LBMA AM/PM USD fixes.
+- **KJPL Spot & INR Desk (Type 1 & Type 2)**: Direct ingestion of KJPL `SPOT-GOLD`, `SPOT-SILVER`, `SPOT-INR`, and Indian contracts (`GOLDDEC`, `SILVERDEC`). *(Yahoo Finance / `yfinance` is permanently decommissioned per ADR-001.)*
 - **Mathematical Benchmark Conversion**:
-  $$\text{Global Gold (INR/g)} = \frac{\text{XAU/USD} \times \text{USD/INR}}{31.1034768}$$
+  $$\text{KJPL Spot Gold (INR/g)} = \frac{\text{SPOT-GOLD (USD/oz)} \times \text{SPOT-INR}}{31.1034768}$$
 - **Domestic Premium / Disparity Index**:
-  $$\text{Premium (\%)} = \frac{\text{KJPL Rate} - \text{Global Rate (INR/g)}}{\text{Global Rate (INR/g)}} \times 100$$
-  *Reflects India's Basic Customs Duty (BCD), Agriculture Infrastructure and Development Cess (AIDC), and local landing premiums (typically +5.5% to +7.5%).*
-- **Debounced Active Refresh**: User-triggered on-demand refresh with a 60-second server debounce window and explicit freshness indicators (`FRESH` <10m, `DELAYED` <60m, `STALE` >60m).
+  $$\text{Premium (\%)} = \frac{\text{KJPL Rate} - \text{KJPL Spot (INR/g)}}{\text{KJPL Spot (INR/g)}} \times 100$$
+- **Real-Time SSE & Explicit Freshness Badges**: Consolidated `/api/bullion/dashboard` + Server-Sent Events (`/api/bullion/stream`) reflecting verified database state (`LIVE`, `FRESH`, `DELAYED`, `STALE`, `MARKET_CLOSED`, `SOURCE_UNAVAILABLE`, `QUARANTINED`).
 
 ### 2. Personal Bullion Portfolio Tracking
 - **Physical Holdings Management**: Add, update, and manage Gold & Silver holdings (bars, coins, jewelry).
@@ -51,45 +50,46 @@
 
 ```mermaid
 flowchart TD
-    subgraph DataSources["External Data Ingestion"]
-        KJPL["KJPL Bullion Scraper (Ahmedabad Spot)"]
-        YF["Yahoo Finance (GC=F, SI=F, USDINR=X)"]
-        NewsRSS["Financial News Desks (RSS/Web)"]
+    subgraph DataSources["Exclusive Bullion Ingestion (KJPL) + News"]
+        KJPL_A["Pipeline A: GitHub Actions -> KJPL MJDTA HTML"]
+        KJPL_B["Pipeline B: Oracle Worker -> KJPL WS + kjpl.txt"]
+        NewsRSS["Financial News Desks (GDELT / RSS)"]
     end
 
     subgraph Storage["Persistence Layer"]
-        CSVData["Raw Flat CSVs (data/kjpl, data/market, data/news)"]
-        SQLDB["Relational DB (PostgreSQL / SQLite fallback)"]
+        NeonDB["Neon PostgreSQL (Numeric + Quarantine Audit)"]
+        SQLiteDev["Local SQLite Fallback (Dev/Tests Only)"]
+        CSVData["Audited/Quarantined CSVs (data/kjpl, data/news)"]
         ProcData["Processed ML Datasets (ml/data/processed)"]
     end
 
-    subgraph Backend["FastAPI Backend Services"]
-        DataSvc["Data & Rate Refresh Service"]
+    subgraph Backend["Oracle Always Free: FastAPI + Worker"]
+        BullionSvc["BullionService + Consolidated Dashboard + SSE"]
         PortSvc["Portfolio Service (Fine Weight, PnL)"]
         AlertSvc["Alert & Threshold Engine"]
         NewsSvc["News & FinBERT Sync Pipeline"]
         PredSvc["Prediction & ML Feature Engine"]
     end
 
-    subgraph Frontend["Modern Financial Terminal (Next.js 16 + Tailwind)"]
-        OverviewTab["Market Overview & Domestic Disparity"]
+    subgraph Frontend["Vercel Hobby: Next.js 16 + Tailwind"]
+        OverviewTab["Market Overview & KJPL Live Desk"]
         PortfolioTab["Personal Bullion Holdings & PnL Modal"]
         PredictTab["AI Forecasting & Progress Tracker"]
         NewsTab["FinBERT Market Intelligence Feed"]
         AlertsTab["Price & Premium Trigger Rules"]
     end
 
-    KJPL --> CSVData
-    YF --> CSVData
+    KJPL_A --> NeonDB
+    KJPL_B --> NeonDB
     NewsRSS --> CSVData
 
-    CSVData --> DataSvc
+    NeonDB <--> BullionSvc
+    NeonDB <--> PortSvc
+    NeonDB <--> AlertSvc
     CSVData --> NewsSvc
-    SQLDB <--> PortSvc
-    SQLDB <--> AlertSvc
     ProcData <--> PredSvc
 
-    DataSvc --> OverviewTab
+    BullionSvc --> OverviewTab
     PortSvc --> PortfolioTab
     PredSvc --> PredictTab
     NewsSvc --> NewsTab
@@ -101,15 +101,15 @@ flowchart TD
 ## 🚀 Quick Start & Setup
 
 ### Prerequisites
-- **Python 3.11+**
-- **Node.js 18+ & npm**
-- **PostgreSQL** (optional; the application gracefully falls back to SQLite `data/goldsense.db` if PostgreSQL is unavailable)
+- **Python 3.12** (backend venv)
+- **Node.js 20+ & npm** (Next.js frontend)
+- **Neon PostgreSQL** in `ENVIRONMENT=production` (`DATABASE_URL` with `sslmode=require`, fail-closed); local dev/test environments allow SQLite (`data/goldsense.db`).
 
 ### 1. Clone Repository & Environment Setup
 ```bash
 git clone -b develop https://github.com/Dhruv-vm/GoldSense-AI.git
 cd GoldSense-AI
-cp backend/.env.example backend/.env
+cp .env.example .env
 ```
 
 ### 2. Backend Setup
@@ -117,12 +117,13 @@ cp backend/.env.example backend/.env
 cd backend
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-api.txt
 
-# Run test suite to verify installation
-pytest tests/ -v
+# Apply migrations & run test suite
+alembic upgrade head
+PYTHONPATH=backend .venv/bin/pytest tests/ -v
 
-# Start FastAPI application
+# Start FastAPI application (from repo root or backend/)
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 The interactive API documentation is available at `http://localhost:8000/docs`.
@@ -142,11 +143,16 @@ Open `http://localhost:3000` in your browser.
 
 ```text
 GoldSense-AI/
-├── .github/workflows/          # Automated GitHub Actions collectors and CI
-│   ├── kjpl_collector.yml      # Scheduled KJPL rate ingestion
-│   ├── market_collector.yml    # Scheduled Yahoo Finance market collector
-│   └── news_collector.yml      # Scheduled financial news collector
+├── .github/workflows/          # Automated GitHub Actions collectors (no develop git commits)
+│   ├── kjpl-collector.yml      # Pipeline A MJDTA ingestion -> NEON_DATABASE_URL
+│   ├── market-collector.yml    # Decommissioned Yahoo stub
+│   ├── news-collector.yml      # Scheduled financial news collector
+│   └── pipeline-update.yml     # Feature engineering & ML evaluation validator
+├── deploy/oracle/              # Systemd units & Nginx SSE config for Oracle Always Free
 ├── backend/
+│   ├── requirements-api.txt    # Lean FastAPI + Neon runtime deps
+│   ├── requirements-worker.txt # Lean live KJPL worker deps (websockets, psycopg)
+│   ├── requirements-ml.txt     # FinBERT / PyTorch / scikit-learn offline ML deps
 │   ├── app/
 │   │   ├── api/routes/         # FastAPI endpoints (kjpl, market, portfolio, alerts, news, prediction)
 │   │   ├── db/                 # Database session and SQLite fallback handler
@@ -186,38 +192,26 @@ GoldSense-AI/
 
 Run the complete backend test suite:
 ```bash
-cd backend
-source .venv/bin/activate
-pytest tests/ -v
+PYTHONPATH=backend backend/.venv/bin/pytest backend/tests/ -v
 ```
-All **88 unit and integration tests** validate:
-- Dynamic conversion math (Troy oz to grams, USD/INR conversion).
-- Domestic premium and Indian customs duty parity.
-- Portfolio fine weight calculations across 999.9, 995, 916, 750 purities.
-- Multi-user portfolio isolation and CRUD constraints.
-- Prediction service graceful handling of experimental sample counts (<50).
-- Bullion directional impact mapping and macroeconomic driver attribution.
-- Syndicated wire clustering and deduplication.
-- Live freshness-first news signal aggregation and recency window enforcement.
-- Insufficient fresh news safety guard (`INSUFFICIENT_FRESH_RELEVANT_NEWS`).
-- Zero-lookahead feature alignment invariants.
-- Pipeline output validation and evaluation artifact integrity.
-- API endpoints for rate overview, debounced refresh, alerts, and live news signals.
+Tests validate:
+- Exclusive KJPL unit normalization, MJDTA/HTML parsing, and Type 1/2/3 live stream extraction.
+- Historical corruption quarantine rules and `Decimal`/`Numeric` persistence.
+- Neon URL normalization (`sslmode=require`), production fail-closed startup, `/health` 503 degradation, and SSE streaming.
+- Multi-user portfolio isolation, auth enforcement, zero-lookahead news/ML invariants, and API endpoints.
 
 ---
 
 ## 📜 Documentation Index
 
 Detailed engineering guides and architectural specifications are organized in the `docs/` directory:
+- [Master Engineering Audit](docs/VMD_BULLION_MASTER_AUDIT.md)
+- [ADR-001: KJPL + Oracle + Neon + Vercel](docs/architecture/ADR_001_KJPL_ORACLE_NEON_VERCEL.md)
+- [KJPL Data Dictionary](docs/data/KJPL_DATA_DICTIONARY.md)
+- [Historical Remediation Report](docs/data/REMEDIATION_REPORT.md)
 - [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md)
-- [Data Flow & Cutoff Rules](docs/architecture/DATA_FLOW.md)
 - [Database Schema & Migrations](docs/architecture/DATABASE_SCHEMA.md)
-- [Rate Units & Conversion Math](docs/data/RATE_UNITS_AND_CONVERSIONS.md)
-- [Personal Bullion Portfolio Model](docs/portfolio/PORTFOLIO_DATA_MODEL.md)
-- [FinBERT News Sentiment Pipeline](docs/news/SENTIMENT_ANALYSIS.md)
-- [News Signal Research Report](docs/ml/NEWS_PREDICTIVE_SIGNAL_RESEARCH.md)
-- [Machine Learning Zero-Leakage Engine](docs/ml/LEAKAGE_PREVENTION.md)
-- [Model Limitations & Data Thresholds](docs/ml/MODEL_LIMITATIONS.md)
+- [Deployment Operations](docs/operations/DEPLOYMENT.md)
 
 ---
 

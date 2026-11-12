@@ -1,0 +1,785 @@
+{
+  "generated_at": "2026-11-11T14:27:40.195220+00:00",
+  "protocol_version": "EXPERIMENT_PROTOCOL_V1",
+  "model_version": "RIDGE_STD_V1",
+  "status": "INSUFFICIENT_PROSPECTIVE_SAMPLES",
+  "backtest_status": "INSUFFICIENT_SAMPLE",
+  "target_spec": {
+    "product_key": "MJDTA_GOLD_24K",
+    "city_code": "CHENNAI",
+    "source_product_id": "MJDTA_GOLD",
+    "tax_basis": "EXCL_GST",
+    "purity": 0.999,
+    "unit": "INR_PER_1G",
+    "source_system": "KJPL_MJDTA"
+  },
+  "mjdta_audit": {
+    "audited_at": "2026-11-11T14:27:40.297244+00:00",
+    "spec": {
+      "product_key": "MJDTA_GOLD_24K",
+      "city_code": "CHENNAI",
+      "source_product_id": "MJDTA_GOLD",
+      "tax_basis": "EXCL_GST",
+      "purity": 0.999,
+      "unit": "INR_PER_1G",
+      "source_system": "KJPL_MJDTA"
+    },
+    "total_raw_rows": 1,
+    "parsed_valid_rows": 1,
+    "eligible_publications": 1,
+    "excluded_observations": 0,
+    "status_counts": {
+      "VALID_EXPLICIT_TIMESTAMP": 1
+    },
+    "earliest_eligible_observed_at": "2026-11-11T09:26:04.307833+00:00",
+    "latest_eligible_observed_at": "2026-11-11T09:26:04.307833+00:00",
+    "min_gold_inr_per_g": 13015.0,
+    "max_gold_inr_per_g": 13015.0,
+    "source_backend": "database"
+  },
+  "news_archive_provenance": {
+    "SYNTHETIC_FIXTURE": 23,
+    "HISTORICAL_UNVERIFIED_AVAILABILITY": 3913,
+    "DUPLICATE": 1
+  },
+  "news_languages_top5": {
+    "en": 2405,
+    "zh": 726,
+    "es": 76,
+    "fr": 75,
+    "ar": 67
+  },
+  "collector_v2_runs_count": 0,
+  "latest_collector_v2_run": null,
+  "human_review": {
+    "status": "PENDING_HUMAN_ANNOTATIONS",
+    "total_sample_rows": 250,
+    "human_labeled_rows": 0,
+    "invalid_label_count": 0,
+    "invalid_label_rows": [],
+    "min_required_annotations": 20,
+    "predicted_unknown_rate": 0.224,
+    "message": "Human gold-impact evaluation requires at least 20 valid manually annotated rows; found 0 valid and 0 invalid. Populate `human_gold_impact` in human_review_sample.csv and re-run."
+  },
+  "eligible_publications": 1,
+  "verified_news_coverage_origins": 0,
+  "min_evaluation_samples": 30,
+  "prospective_ledger": {
+    "generation_mode": "PROSPECTIVE",
+    "status": "INSUFFICIENT_PROSPECTIVE_SAMPLES",
+    "total_prospective_origins": 0,
+    "matured_prospective_origins": 0,
+    "min_evaluation_samples": 30,
+    "latest_prospective_forecasts": [],
+    "metrics_by_horizon": {
+      "h1": {
+        "horizon_publications": 1,
+        "paired_comparable_count": 0,
+        "arms": {
+          "NO_CHANGE": {
+            "all_valid_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "paired_comparable_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "non_overlapping_paired": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            }
+          },
+          "PRICE_ONLY": {
+            "all_valid_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "paired_comparable_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "non_overlapping_paired": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            }
+          },
+          "NEWS_ONLY": {
+            "all_valid_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "paired_comparable_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "non_overlapping_paired": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            }
+          },
+          "HYBRID": {
+            "all_valid_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "paired_comparable_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "non_overlapping_paired": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            }
+          }
+        },
+        "diebold_mariano": {
+          "hybrid_vs_price_only": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "n": 0,
+            "min_required": 20,
+            "dm_stat": null,
+            "p_value_two_sided": null
+          },
+          "hybrid_vs_no_change": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "n": 0,
+            "min_required": 20,
+            "dm_stat": null,
+            "p_value_two_sided": null
+          },
+          "price_only_vs_no_change": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "n": 0,
+            "min_required": 20,
+            "dm_stat": null,
+            "p_value_two_sided": null
+          }
+        }
+      },
+      "h3": {
+        "horizon_publications": 3,
+        "paired_comparable_count": 0,
+        "arms": {
+          "NO_CHANGE": {
+            "all_valid_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "paired_comparable_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "non_overlapping_paired": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            }
+          },
+          "PRICE_ONLY": {
+            "all_valid_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "paired_comparable_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "non_overlapping_paired": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            }
+          },
+          "NEWS_ONLY": {
+            "all_valid_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "paired_comparable_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "non_overlapping_paired": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            }
+          },
+          "HYBRID": {
+            "all_valid_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "paired_comparable_origins": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            },
+            "non_overlapping_paired": {
+              "status": "INSUFFICIENT_SAMPLE",
+              "sample_count": 0,
+              "min_required_samples": 30,
+              "mae_log_return": null,
+              "rmse_log_return": null,
+              "mae_inr_per_g": null,
+              "rmse_inr_per_g": null,
+              "directional_accuracy": null,
+              "brier_score": null
+            }
+          }
+        },
+        "diebold_mariano": {
+          "hybrid_vs_price_only": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "n": 0,
+            "min_required": 20,
+            "dm_stat": null,
+            "p_value_two_sided": null
+          },
+          "hybrid_vs_no_change": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "n": 0,
+            "min_required": 20,
+            "dm_stat": null,
+            "p_value_two_sided": null
+          },
+          "price_only_vs_no_change": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "n": 0,
+            "min_required": 20,
+            "dm_stat": null,
+            "p_value_two_sided": null
+          }
+        }
+      }
+    }
+  },
+  "latest_snapshot": {
+    "snapshot_id": "snap_a85a79fff25aa72e",
+    "generation_mode": "BACKTEST",
+    "cutoff_time": "2026-11-11T09:26:04.307833+00:00",
+    "label_cutoff_time": "2026-11-11T09:26:04.307833+00:00",
+    "target_product": "MJDTA_GOLD_24K",
+    "origin_observation_id": 3,
+    "origin_observed_at": "2026-11-11T09:26:04.307833+00:00",
+    "origin_gold_price_inr_per_g": 13015.0,
+    "feature_version": "NEWS_FEATURES_V2",
+    "cluster_version": "CLUSTER_V2",
+    "sentiment_version": "GOLD_SENTIMENT_V2",
+    "feature_hash": "ac391261c16b1548c0e23d83dfcf0650",
+    "n_clusters_relevant": 0,
+    "net_impact": null,
+    "unknown_share": null,
+    "coverage_ok": false,
+    "features_json": {
+      "ret_1": 0.0,
+      "ret_3": 0.0,
+      "ret_5": 0.0,
+      "vol_5": 0.0,
+      "n_clusters_relevant": 0,
+      "net_impact": null,
+      "unknown_share": null,
+      "coverage_ok": 0
+    },
+    "is_immutable": true
+  },
+  "latest_forecasts": [],
+  "metrics_by_horizon": {
+    "h1": {
+      "horizon_publications": 1,
+      "paired_comparable_count": 0,
+      "arms": {
+        "NO_CHANGE": {
+          "all_valid_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "paired_comparable_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "non_overlapping_paired": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          }
+        },
+        "PRICE_ONLY": {
+          "all_valid_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "paired_comparable_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "non_overlapping_paired": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          }
+        },
+        "NEWS_ONLY": {
+          "all_valid_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "paired_comparable_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "non_overlapping_paired": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          }
+        },
+        "HYBRID": {
+          "all_valid_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "paired_comparable_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "non_overlapping_paired": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          }
+        }
+      },
+      "diebold_mariano": {
+        "hybrid_vs_price_only": {
+          "status": "INSUFFICIENT_SAMPLE",
+          "n": 0,
+          "min_required": 20,
+          "dm_stat": null,
+          "p_value_two_sided": null
+        },
+        "hybrid_vs_no_change": {
+          "status": "INSUFFICIENT_SAMPLE",
+          "n": 0,
+          "min_required": 20,
+          "dm_stat": null,
+          "p_value_two_sided": null
+        },
+        "price_only_vs_no_change": {
+          "status": "INSUFFICIENT_SAMPLE",
+          "n": 0,
+          "min_required": 20,
+          "dm_stat": null,
+          "p_value_two_sided": null
+        }
+      }
+    },
+    "h3": {
+      "horizon_publications": 3,
+      "paired_comparable_count": 0,
+      "arms": {
+        "NO_CHANGE": {
+          "all_valid_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "paired_comparable_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "non_overlapping_paired": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          }
+        },
+        "PRICE_ONLY": {
+          "all_valid_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "paired_comparable_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "non_overlapping_paired": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          }
+        },
+        "NEWS_ONLY": {
+          "all_valid_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "paired_comparable_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "non_overlapping_paired": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          }
+        },
+        "HYBRID": {
+          "all_valid_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "paired_comparable_origins": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          },
+          "non_overlapping_paired": {
+            "status": "INSUFFICIENT_SAMPLE",
+            "sample_count": 0,
+            "min_required_samples": 30,
+            "mae_log_return": null,
+            "rmse_log_return": null,
+            "mae_inr_per_g": null,
+            "rmse_inr_per_g": null,
+            "directional_accuracy": null,
+            "brier_score": null
+          }
+        }
+      },
+      "diebold_mariano": {
+        "hybrid_vs_price_only": {
+          "status": "INSUFFICIENT_SAMPLE",
+          "n": 0,
+          "min_required": 20,
+          "dm_stat": null,
+          "p_value_two_sided": null
+        },
+        "hybrid_vs_no_change": {
+          "status": "INSUFFICIENT_SAMPLE",
+          "n": 0,
+          "min_required": 20,
+          "dm_stat": null,
+          "p_value_two_sided": null
+        },
+        "price_only_vs_no_change": {
+          "status": "INSUFFICIENT_SAMPLE",
+          "n": 0,
+          "min_required": 20,
+          "dm_stat": null,
+          "p_value_two_sided": null
+        }
+      }
+    }
+  }
+}

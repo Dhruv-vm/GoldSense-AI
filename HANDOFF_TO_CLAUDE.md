@@ -1,11 +1,13 @@
 # VMD BULLION — MASTER ENGINEERING HANDOFF FOR CLAUDE
 
-> **Document Type:** System Architecture & Operational Handover  
+> **[HISTORICAL HANDOFF — SUPERSEDED BY `docs/architecture/ADR_001_KJPL_ORACLE_NEON_VERCEL.md` (2026-11-11)]**
+> Earlier revisions of this handoff referenced **Yahoo Finance (`yfinance`)**, **Supabase PostgreSQL**, **Render**, and GitHub Actions CSV commits to `develop`. Those choices have been superseded: VMD Bullion now uses **KJPL exclusively** (Pipeline A GitHub Actions MJDTA -> Neon + Pipeline B Oracle Cloud live WS/`kjpl.txt` worker -> Neon), **Neon PostgreSQL Free Tier** (`Numeric` precision + quarantine audit), **Oracle Cloud Always Free**, and **Vercel Hobby**. See [VMD_BULLION_MASTER_AUDIT.md](docs/VMD_BULLION_MASTER_AUDIT.md) and [ADR-001](docs/architecture/ADR_001_KJPL_ORACLE_NEON_VERCEL.md).
+
+> **Document Type:** System Architecture & Historical Operational Handover
 > **Target Audience:** Claude (Anthropic AI Assistant / Claude Code) & Contributing Engineers  
 > **Project Name:** VMD Bullion (Elevated from GoldSense AI)  
 > **Repository:** `https://github.com/Dhruv-vm/GoldSense-AI`  
-> **Active Branch:** `develop`  
-> **Status:** Phase 1 (Audit), Phase 2 (Parser), Phase 3 (Cloud Collector), Phase 4 (DB Schema/Migrations), Phase 5 (FastAPI Bullion Endpoints), and Phase 6 (Bloomberg Terminal Frontend) are **COMPLETE & VERIFIED**.
+> **Active Branch:** `develop`
 
 ---
 
@@ -251,40 +253,38 @@ Here are clear boundaries and recommendations on what to alter vs. what to keep 
 
 ---
 
-## 7. Supabase Production Connection Guide
+## 7. Neon PostgreSQL & Oracle Cloud Production Connection Guide *(Updated — replaces historical Supabase/Render instructions)*
 
-When the user is ready to wire the live Supabase PostgreSQL database:
+> **Note:** The historical Supabase + Render runtime instructions have been superseded by **Neon PostgreSQL** (managed Postgres with separated `vmd_migrator` and `vmd_app_runtime` roles) and **Oracle Cloud Infrastructure (OCI)** (`systemd` services behind Nginx; see `deploy/oracle/` and `docs/architecture/ADR_001_KJPL_ORACLE_NEON_VERCEL.md`).
 
-### Step 1: User Adds GitHub Action Secret
+### Step 1: GitHub Actions Secrets
 User navigates to:  
 `https://github.com/Dhruv-vm/GoldSense-AI/settings/secrets/actions`  
-And adds secret:
-- **Name:** `SUPABASE_DATABASE_URL`
-- **Value:** `postgresql://postgres.[REF]:[PASSWORD]@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres`
+And configures separated least-privilege secrets:
+- **`NEON_MIGRATION_DATABASE_URL`**: `postgresql://vmd_migrator:<MIGRATION_PASSWORD>@<NEON_ENDPOINT>/neondb?sslmode=require` (used exclusively by `.github/workflows/db-migrate.yml`)
+- **`NEON_RUNTIME_DATABASE_URL`**: `postgresql://vmd_app_runtime:<RUNTIME_PASSWORD>@<NEON_ENDPOINT>/neondb?sslmode=require` (used by runtime collector workflows)
 
-### Step 2: Apply Alembic Migrations Against Supabase
+### Step 2: Apply Alembic Migrations Against Neon (`vmd_migrator` only)
 ```bash
-DATABASE_URL="postgresql://postgres.[REF]:[PASSWORD]@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres" \
-cd backend && alembic upgrade head
+MIGRATION_DATABASE_URL="postgresql://vmd_migrator:<MIGRATION_PASSWORD>@<NEON_ENDPOINT>/neondb?sslmode=require" \
+PYTHONPATH=backend alembic -c backend/alembic.ini upgrade head
 ```
 
-### Step 3: Run the Verification Script
+### Step 3: Run the Neon & Schema Verification Scripts
 ```bash
-DATABASE_URL="postgresql://postgres.[REF]:[PASSWORD]@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres" \
-PYTHONPATH=backend python scripts/verify_supabase_connection.py
-```
-This script automatically:
-1. Verifies TCP & SSL connection to the pooler.
-2. Confirms all 10 tables exist and schema matches.
-3. Verifies reference cities and products are seeded.
-4. Executes a live test insertion, read-back, and transactional cleanup.
+DATABASE_URL="postgresql://vmd_app_runtime:<RUNTIME_PASSWORD>@<NEON_ENDPOINT>/neondb?sslmode=require" \
+PYTHONPATH=backend python scripts/verify_neon_connection.py
 
-### Step 4: Render Deployment Environment Variables
-In the Render dashboard for the backend service:
-- `DATABASE_URL`: `postgresql://postgres.[REF]:[PASSWORD]@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres`
+DATABASE_URL="postgresql://vmd_app_runtime:<RUNTIME_PASSWORD>@<NEON_ENDPOINT>/neondb?sslmode=require" \
+PYTHONPATH=backend python scripts/verify_schema_revision.py
+```
+
+### Step 4: Oracle Cloud API & Worker Environment Variables
+In `/etc/vmd-bullion/api.env` and `/etc/vmd-bullion/worker.env` (see `.env.example` and `deploy/oracle/`):
+- `DATABASE_URL`: `postgresql://vmd_app_runtime:<RUNTIME_PASSWORD>@<NEON_ENDPOINT>/neondb?sslmode=require`
 - `ENVIRONMENT`: `production`
 - `PYTHONPATH`: `backend`
-- Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- API Start Command (`deploy/oracle/vmd-bullion-api.service`): `uvicorn app.main:app --host 127.0.0.1 --port 8000`
 
 ---
 

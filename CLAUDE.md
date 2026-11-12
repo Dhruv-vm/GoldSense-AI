@@ -39,11 +39,11 @@ The core mission is real, institutional physical cash gold & silver market intel
 cd /Users/dhruv/dhruv\ files/gold/GoldSense-AI
 source backend/.venv/bin/activate
 
-# Run full backend test suite (104 tests currently passing)
-cd backend && pytest tests/ -v
+# Run full backend test suite
+PYTHONPATH=backend backend/.venv/bin/pytest backend/tests/ -v
 
 # Run only bullion & collector tests
-pytest tests/test_bullion_api.py tests/test_kjpl_city_extraction.py tests/test_kjpl_collector.py -v
+PYTHONPATH=backend backend/.venv/bin/pytest backend/tests/test_bullion_api.py backend/tests/test_kjpl_city_extraction.py backend/tests/test_kjpl_collector.py -v
 ```
 
 ### Local Backend Server
@@ -62,29 +62,30 @@ npm run build    # Production build verification
 
 ### Database & Alembic Migrations
 ```bash
-# Apply pending migrations (works for both local SQLite and Supabase PostgreSQL)
+# Apply pending migrations (works for both local SQLite and Neon PostgreSQL)
 cd backend
 alembic upgrade head
 
 # Create a new migration if schema models are altered
 alembic revision --autogenerate -m "describe_change"
 
-# Verify Supabase PostgreSQL connection & write/read-back
-DATABASE_URL="postgresql://postgres.[REF]:[PASSWORD]@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres" \
-PYTHONPATH=backend python scripts/verify_supabase_connection.py
+# Verify Neon PostgreSQL connection & write/read-back
+DATABASE_URL="postgresql://[USER]:[PASSWORD]@[NEON-ENDPOINT].neon.tech/[DB]?sslmode=require" \
+PYTHONPATH=backend python scripts/verify_neon_connection.py
 ```
 
-### Scraping & Rate Collectors
+### KJPL Collectors (Exclusive Upstream Source)
 ```bash
-# Run 5-city KJPL collector manually
+# Run Pipeline A: 5-city & MJDTA KJPL HTML collector manually
 PYTHONPATH=backend backend/.venv/bin/python scripts/collect_kjpl_csv.py
 
-# Run market benchmark collector (Yahoo Finance spot gold/silver, USD/INR)
-PYTHONPATH=backend backend/.venv/bin/python scripts/collect_market_csv.py
+# Run Pipeline B: Live KJPL WebSocket + kjpl.txt worker (single-writer via fcntl lock)
+PYTHONPATH=backend backend/.venv/bin/python scripts/kjpl_live_worker.py --once
 
 # Run news intelligence collector (GDELT / RSS)
 PYTHONPATH=backend backend/.venv/bin/python scripts/collect_news_csv.py
 ```
+> **Note:** Yahoo Finance (`yfinance` / `scripts/collect_market_csv.py`) is permanently decommissioned per `docs/architecture/ADR_001_KJPL_ORACLE_NEON_VERCEL.md`. Spot Gold, Spot Silver, and USD/INR parity are sourced exclusively from KJPL.
 
 ---
 
@@ -110,25 +111,29 @@ GoldSense-AI/
 │   │   │   └── portfolio.py        # PortfolioHolding, AlertRule
 │   │   └── services/
 │   │       ├── kjpl/
-│   │       │   ├── parser.py       # City extractor & normalizer (HTML table & JS script regex)
-│   │       │   └── persistence.py  # Dual DB + CSV append-only observation recorder
-│   │       └── bullion_service.py  # Import parity, city matrix, spread calculations
-│   ├── migrations/versions/        # Alembic revision history (0f1a9481a06e: VMD Bullion tables)
-│   └── tests/                      # 104 comprehensive unit & integration tests
+│   │       │   ├── city_parser.py  # HTML MJDTA + Type 1/2/3/LBMA parser & validator
+│   │       │   ├── validator.py    # Unit/purity bounds & historical quarantine rules
+│   │       │   ├── live_worker.py  # Oracle Pipeline B WS + kjpl.txt worker
+│   │       │   └── persistence.py  # Atomic Decimal DB + optional CSV mirror recorder
+│   │       └── bullion_service.py  # KJPL spot parity, city matrix, consolidated dashboard
+│   ├── migrations/versions/        # Alembic revisions through a7c3e91b42d0 (Numeric + Quarantine)
+│   └── tests/                      # Unit & integration tests (backend/tests/)
 ├── frontend/
 │   ├── app/
 │   │   ├── layout.tsx              # Terminal root layout with dark theme & monospace font
 │   │   ├── globals.css             # Bloomberg amber (#f59e0b), emerald (#10b981), terminal styling
-│   │   └── page.tsx                # Terminal UI: 5-city live ticker, India Bullion Desk,
-│   │                               # matrix comparison, import parity, news, vault, data monitor
+│   │   └── page.tsx                # Terminal UI: SSE live stream, 5-city ticker, parity, vault, monitor
+│   └── components/bullion/
+│       └── KjplLiveDeskPanel.tsx   # KJPL Live Terminal Type 1/2 & LBMA USD Desk
 ├── scripts/
-│   ├── collect_kjpl_csv.py         # 5-city KJPL collector with 3x retry + SQLite/Supabase persistence
-│   ├── collect_market_csv.py       # Yahoo Finance market collector with intraday/daily/CSV fallbacks
-│   ├── verify_supabase_connection.py # Supabase PostgreSQL diagnostic & verification script
+│   ├── collect_kjpl_csv.py         # Pipeline A MJDTA collector -> Neon PostgreSQL (NullPool)
+│   ├── kjpl_live_worker.py         # Pipeline B Oracle systemd single-writer worker
+│   ├── remediate_historical_data.py # Quarantines corrupt/duplicate historical CSV & DB rows
+│   ├── verify_neon_connection.py   # Neon PostgreSQL diagnostic & write/read-back verifier
 │   └── validate_pipeline_outputs.py # ML artifact validation
-└── .github/workflows/              # All workflows run on actions/checkout@v7 & setup-python@v7 (Node 24)
-    ├── kjpl-collector.yml          # 5-city KJPL collector (6 India-window crons)
-    ├── market-collector.yml        # Hourly spot/FX collector (staggered at :23 past hour)
+└── .github/workflows/
+    ├── kjpl-collector.yml          # Pipeline A MJDTA collector -> NEON_DATABASE_URL (no git commits)
+    ├── market-collector.yml        # Decommissioned Yahoo stub (manual guard only)
     ├── news-collector.yml          # News collector (03, 09, 15, 21 UTC)
     └── pipeline-update.yml         # Post-news feature/eval pipeline & artifact validator
 ```
@@ -153,29 +158,27 @@ When altering or extending VMD Bullion, follow these specific guidelines:
 ### What You MUST NOT Alter:
 1. **Never synthesize prices**: If KJPL or an upstream source returns 403 or is offline, log `UPSTREAM_UNAVAILABLE` and retain existing verified prices. Do not generate synthetic drift.
 2. **Never break existing routes**: Mobile apps, web components, and cron workflows depend on `/api/bullion/*`, `/api/kjpl/*`, and `/api/market/*`.
-3. **Never ask user for database credentials in chat**: All credentials belong in environment variables (`DATABASE_URL`, `SUPABASE_DATABASE_URL`).
+3. **Never ask user for database credentials in chat**: All credentials belong in environment variables (`DATABASE_URL`, `NEON_DATABASE_URL`).
 
 ---
 
-## 5. Supabase Production Connection Checklist
-When ready to connect to production Supabase PostgreSQL:
-1. Set `DATABASE_URL` in environment (or `SUPABASE_DATABASE_URL` in GitHub Secrets).
-2. Run `alembic upgrade head` to apply all migrations.
-3. Run `PYTHONPATH=backend python scripts/verify_supabase_connection.py` to confirm table integrity, seeding, and live transactional write/read-back.
+## 5. Neon + Oracle + Vercel Production Checklist (ADR-001)
+When ready to connect the live **₹0/month stack** (superseding Supabase + Render):
+1. Set `NEON_DATABASE_URL` in GitHub Repository Secrets (for `.github/workflows/kjpl-collector.yml`). Wait for explicit user approval before retiring legacy `SUPABASE_DATABASE_URL`.
+2. On Oracle Cloud Always Free VM, run `alembic upgrade head` against Neon `DATABASE_URL` (`sslmode=require`), then run `PYTHONPATH=backend python scripts/verify_neon_connection.py`.
+3. Enable `deploy/oracle/vmd-bullion-api.service`, `deploy/oracle/vmd-kjpl-worker.service`, and `deploy/oracle/nginx-vmd-bullion.conf`.
+4. Deploy `frontend/` to Vercel Hobby with `NEXT_PUBLIC_API_BASE_URL` pointing to the Oracle API URL.
 
 ---
 
-## 6. Current Data Status & Invitation for Claude's Input (Updated Nov 10, 2026)
+## 6. Remediated Data Status (Updated Nov 11, 2026)
 
-### Live Data Counts on `develop`
-- `data/kjpl/kjpl_rates.csv`: **53 raw rows** (Sep 19 – Nov 10, 2026)
-- `data/kjpl/city_rates.csv`: **133 rows** (`CHENNAI`: 49, `ALL_INDIA`: 40, `BENGALURU`: 11, `MUMBAI`: 11, `COIMBATORE`: 11, `HYDERABAD`: 11)
-- `data/market/market_rates.csv`: **272 rows**
+### Valid vs Quarantined Data Counts on `develop`
+- `data/kjpl/kjpl_rates.csv`: **47 valid rows** (6 Oct 31 duplicates moved to `data/kjpl/quarantined_kjpl_rates.csv`)
+- `data/kjpl/city_rates.csv`: **8 valid rows** (125 corrupt/fixture/duplicate rows quarantined into `data/kjpl/quarantined_city_rates.csv`)
+- `data/goldsense.db`: Rebuilt cleanly via Alembic (`a7c3e91b42d0`) with **8 valid** observations seeded.
 - `backend/ml/data/processed/evaluation_report.json`: **42 / 50 usable ML events** (`INSUFFICIENT_DATA_FOR_SUPERVISED_TRAINING`, 8 more unique trading events needed before enabling ML inference)
 
-### Where Your Input & Critique Are Welcome
-If you are reviewing this codebase as Claude, feel free to propose concrete improvements on:
-1. **UX & Bloomberg Terminal Density**: Modularizing `frontend/app/page.tsx`, improving mobile ergonomics, and surfacing city arbitrage spreads cleanly.
-2. **Import Parity & MCX Basis Analytics**: Refining landed-cost calculations (BCD/AIDC/GST breakdowns) and MCX futures vs. physical cash basis tracking.
-3. **Production Deployment & Reliability**: Hardening Render/Supabase deployment configs, query indexing, and multi-user vault alert delivery.
-4. **Statistical Threshold Readiness**: Designing the validation gate and baseline comparison strategy once usable ML events reach `>= 50`.
+### Architecture Focus
+- Modularize remaining oversized UI tabs out of `frontend/app/page.tsx` alongside `KjplLiveDeskPanel.tsx`.
+- Wire live `NEON_DATABASE_URL`, Oracle VM, and Vercel Hobby endpoints once infrastructure credentials are provisioned.

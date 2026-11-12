@@ -1,24 +1,24 @@
-# Market Data Pipeline & Scheduled Workflows
+# Market Data Pipeline & Scheduled Workflows (ADR-001)
 
-## 1. Automated GitHub Actions Ingestion
-Market and bullion data are collected on cron schedules via GitHub Actions workflows:
+## 1. Active KJPL-Exclusive Ingestion Pipelines
 
-1. **KJPL Scraper Workflow (`.github/workflows/kjpl_collector.yml`)**:
-   - Runs on schedule during Indian market operating hours.
-   - Extracts current physical spot rates from KJPL.
-   - Appends deduplicated rows to `data/kjpl/kjpl_rates.csv` and commits to `develop`.
+1. **Pipeline A — KJPL MJDTA Collector (`.github/workflows/kjpl-collector.yml`)**:
+   - Runs twice-daily IST crons via GitHub Actions writing directly into Neon PostgreSQL (`NEON_DATABASE_URL`, `DB_USE_NULLPOOL=true`, `ENABLE_CSV_MIRROR=false`).
+   - Strictly executes `--mjdta-only` (MJDTA Gold/Silver + LBMA USD fixes under `KJPL_MJDTA_COLLECTOR`). An explicit interim `--snapshot-only` step (`KJPL_SNAPSHOT_COLLECTOR`) runs independently while `vars.ORACLE_WORKER_ACTIVE != 'true'`, without automated commits to `develop`.
 
-2. **Market Collector Workflow (`.github/workflows/market_collector.yml`)**:
-   - Queries `yfinance` for `GC=F`, `SI=F`, and `USDINR=X`.
-   - Computes estimated parity rates.
-   - Appends observations to `data/market/market_rates.csv`.
+2. **Pipeline B — KJPL Live Terminal Worker (`scripts/kjpl_live_worker.py`)**:
+   - Runs continuously on Oracle Cloud Always Free (`deploy/oracle/vmd-kjpl-worker.service`) under an `fcntl` single-writer lock.
+   - Consumes `ws://www.kjpl.in/ws` and `http://www.kjpl.in/client/kjpl.txt` (`SPOT-GOLD`, `SPOT-SILVER`, `SPOT-INR`, Type 2 Indian contracts, 5-city 100g 999 gold, and `GOLD_1KG_9999`) directly into Neon PostgreSQL.
 
-3. **News Collector Workflow (`.github/workflows/news_collector.yml`)**:
-   - Ingests RSS feeds, applies keyword filtering for bullion topics, and persists raw articles to `data/news/news_articles.csv`.
+3. **Decommissioned Market Collector (`.github/workflows/market-collector.yml`)**:
+   - Yahoo Finance (`yfinance`) collection is permanently decommissioned per ADR-001. Global spot and FX parity come strictly from KJPL.
+
+4. **News Collector Workflow (`.github/workflows/news-collector.yml`)**:
+   - Ingests GDELT 2.0 / financial RSS feeds into `data/news/live_news.csv` and `data/news/news_articles.csv`.
 
 ---
 
 ## 2. Ingestion Resilience & Schema Integrity
-- **Deduplication**: Ingestion jobs key on timestamp and title hashes to avoid duplicate rows.
-- **Append-Only Policy**: No collector job is permitted to overwrite or rewrite historical CSV records.
-- **Fail-Safe Execution**: If an external endpoint times out or is blocked, the job logs a warning and exits cleanly without polluting the persistent CSV files.
+- **Validation & Quarantine**: Observations failing product/unit sanity bounds (`backend/app/services/kjpl/validator.py`) are quarantined (`QUARANTINED`) rather than contaminating clean series.
+- **Unchanged Rate Suppression**: Repeated identical prices increment `last_verified_at` on `bullion_latest_rates` and log `is_changed=False` cleanly.
+- **Fail-Safe Execution**: If upstream KJPL endpoints are unavailable, collector outages are logged in `collector_runs` / `data_source_status` without inventing prices.

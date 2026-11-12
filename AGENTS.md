@@ -11,9 +11,10 @@ This document establishes the binding engineering principles, operational invari
    - Core coverage: physical cash gold and silver across the 5 primary Indian hubs (Chennai, Bengaluru, Mumbai, Coimbatore, Hyderabad), 1KG 99.99 Pure Gold Bar, and MJDTA benchmarks.
    - All rate extraction, city comparisons, and terminal displays must serve physical bullion clarity.
 
-2. **Absolute Data Integrity & Zero Fabrication**
-   - Never fabricate data, synthesize artificial live or historical prices, or simulate artificial tick volatility.
-   - If historical data contains gaps, holidays, or missing returns, document them transparently or handle them via forward-filling/masking. Never invent values.
+2. **Absolute Data Integrity & KJPL-Exclusive Upstream Policy**
+   - **KJPL is the exclusive bullion and FX upstream data source** (MJDTA benchmarks, LBMA USD fixes, Type 1 `SPOT-GOLD`/`SPOT-SILVER`/`SPOT-INR`, Type 2 Indian contracts, and Type 3 5-city/1KG physical rates). Never introduce `yfinance`, Yahoo Finance, external XAUUSD/MCX APIs, or competitor scrapers.
+   - Never fabricate data, synthesize artificial live or historical prices, or simulate artificial tick volatility. If a KJPL value is unavailable, mark it `SOURCE_UNAVAILABLE` (`None`).
+   - Quarantine corrupt or unverified observations (`QUARANTINED` status) instead of overwriting history or mixing units/purities.
    - When upstream rates are unchanged or markets are closed, reflect `is_changed: false` faithfully.
 
 3. **Zero Lookahead Bias & Point-in-Time Discipline**
@@ -54,15 +55,16 @@ Always adhere to standardized metallurgical and financial constants:
 - **Domestic Spot Valuation**:
   $$\text{Current Valuation} = \text{Gross Weight (g)} \times \text{Spot Rate (INR/g)} \times \left(\frac{\text{Purity}}{999}\right)$$
 - **Domestic Disparity / Premium**:
-  $$\text{Domestic Premium (\%)} = \frac{\text{KJPL Rate} - \text{Global Rate (INR/g)}}{\text{Global Rate (INR/g)}} \times 100$$
-  *Typical range: $+5.5\%$ to $+7.5\%$ reflecting India's Basic Customs Duty (6% BCD) and AIDC.*
+  $$\text{Domestic Premium (\%)} = \frac{\text{KJPL Rate} - \text{KJPL Spot (INR/g)}}{\text{KJPL Spot (INR/g)}} \times 100$$
+  *Calculated strictly from KJPL Spot Gold (`SPOT-GOLD`) × KJPL FX (`SPOT-INR`) ÷ 31.1034768. Reflects India's customs duties, local premiums, and logistics without hardcoded duty guesses.*
 
 ---
 
 ## 3. Architecture & Code Conventions
 
 ### Backend (FastAPI + SQLAlchemy)
-- Resilient persistence: Check connection strings; automatically fall back from PostgreSQL to SQLite (`data/goldsense.db`) in local developer environments without raising unhandled exceptions.
+- Resilient persistence: Use Neon PostgreSQL (`sslmode=require`, `postgresql+psycopg://`, `Numeric` decimal precision) in production and fail closed if `DATABASE_URL` is missing, SQLite, or unreachable when `ENVIRONMENT=production`. Allow SQLite fallback (`data/goldsense.db`) strictly for local development/tests.
+- Single-writer collector separation: Pipeline A runs scheduled MJDTA collection via GitHub Actions directly to Neon (`DB_USE_NULLPOOL=true`), and Pipeline B runs continuously on Oracle Cloud Always Free via `scripts/kjpl_live_worker.py` (`systemd`). Do not embed APScheduler inside FastAPI.
 - Layered service architecture: Keep business logic inside `backend/app/services/` (`data_service.py`, `portfolio_service.py`, `alert_service.py`), keeping API route handlers lean.
 - Schemas & Validation: Always use Pydantic models for request bodies and response schemas.
 - Error handling: Return structured JSON with HTTP error codes (400 for bad input, 404 for missing items, 429 for rate limit/debounce).

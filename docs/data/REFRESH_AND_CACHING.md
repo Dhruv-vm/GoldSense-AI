@@ -1,25 +1,20 @@
-# Rate Refresh Lifecycle & Caching Strategy
+# Rate Refresh Lifecycle, Freshness & SSE Streaming
 
 ## 1. Freshness Classification
-To provide transparent visibility into market quote latency, `DataService` labels rates using three freshness tiers:
+To provide transparent visibility into market quote latency, VMD Bullion labels rates using truthful operational tiers:
 
-| Badge | Age Threshold | Significance |
+| Badge | Condition / Threshold | Significance |
 | :--- | :--- | :--- |
-| **`FRESH`** | $< 10\text{ minutes}$ | High-confidence real-time market quote. |
-| **`DELAYED`** | $10\text{ to } 60\text{ minutes}$ | Standard intraday batch delay. |
-| **`STALE`** | $> 60\text{ minutes}$ | Market closed, weekend, holiday, or upstream delay. |
+| **`LIVE`** | Continuous Pipeline B WS / `kjpl.txt` sync active | Real-time KJPL live terminal observation. |
+| **`FRESH`** | $< 10\text{ minutes}$ | High-confidence verified KJPL quote. |
+| **`DELAYED`** | $10\text{ to } 60\text{ minutes}$ | Standard intraday batch interval. |
+| **`STALE`** | $> 60\text{ minutes}$ | Upstream quote has exceeded active freshness threshold. |
+| **`MARKET_CLOSED`** | KJPL `Type 4` status flag = closed or outside active session | Official market closed state (unchanged last closing rate). |
+| **`SOURCE_UNAVAILABLE`** | Upstream fetch unreachable or field missing | Genuine unavailability; never replaced with fabricated values. |
+| **`QUARANTINED`** | Failed `validator.py` purity/unit sanity check | Isolated for audit; excluded from live KPIs. |
 
 ---
 
-## 2. Debounced Refresh Mechanism
-When a user clicks "Refresh Rates" on the frontend terminal:
-1. Client issues `POST /api/v1/market/refresh`.
-2. Backend checks the in-memory timestamp of the last refresh request.
-3. If less than 60 seconds have elapsed:
-   - Responds with `HTTP 429 Too Many Requests`.
-   - Returns JSON: `{"status": "cooldown", "remaining_seconds": N}`.
-4. If 60+ seconds have elapsed:
-   - Queries `yfinance` for live `GC=F`, `SI=F`, `USDINR=X`.
-   - Appends new observation to `data/market/market_rates.csv`.
-   - Updates memory cache and resets the 60-second timer.
-   - Returns updated rates with status 200.
+## 2. SSE Real-Time Delivery & Manual Sync
+- **Automatic Live Updates**: Frontend subscribes via `EventSource` to `GET /api/bullion/stream`, emitting `snapshot` frames only when PostgreSQL `BullionLatestRate` advances.
+- **Manual Terminal Refresh**: Reloads verified persisted state via `GET /api/bullion/dashboard` (`POST /api/v1/market/refresh` no longer calls Yahoo Finance; spot parity uses persisted KJPL `SPOT-GOLD`, `SPOT-SILVER`, and `SPOT-INR`).
