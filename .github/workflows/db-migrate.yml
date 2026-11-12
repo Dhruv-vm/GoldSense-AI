@@ -1,0 +1,44 @@
+name: Neon Database Migrations
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop, main]
+    paths:
+      - 'backend/migrations/**'
+      - 'backend/alembic.ini'
+      - '.github/workflows/db-migrate.yml'
+
+concurrency:
+  group: neon-db-migrate-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  alembic-migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Install migration dependencies
+        run: |
+          python -m pip install --upgrade pip --retries 5 --timeout 30
+          pip install --retries 5 --timeout 30 sqlalchemy pydantic pydantic-settings psycopg[binary] alembic python-dotenv numpy pandas scipy requests beautifulsoup4 lxml
+
+      - name: Run Alembic upgrade head using dedicated migration credentials
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.NEON_MIGRATION_DATABASE_URL }}
+          REQUIRE_POSTGRES: "true"
+          DB_USE_NULLPOOL: "true"
+        run: |
+          test -n "${MIGRATION_DATABASE_URL}" || (echo "ERROR: NEON_MIGRATION_DATABASE_URL secret must be set for migrations (distinct from runtime credentials)." && exit 1)
+          cd backend && alembic upgrade head

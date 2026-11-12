@@ -250,11 +250,10 @@ def test_workflow_schedule_ordering():
         on_clause = content.get(True) or content.get("on")
         return on_clause.get("schedule", [])
 
-    # 1. Check pipeline-update runs after news collector evening batch (15:00 UTC)
-    pipeline_crons = [c["cron"] for c in get_schedule(pipeline_content)]
-    assert "38 15 * * *" in pipeline_crons, (
-        f"Pipeline update cron {pipeline_crons} must be '38 15 * * *' (15:38 UTC = 09:08 PM IST) "
-        "to run strictly after the 15:00 UTC news batch."
+    # 1. F-20 (Audit #3): legacy pipeline-update is MANUAL-ONLY (no cron, no workflow_run chain)
+    pipeline_on = pipeline_content.get(True) or pipeline_content.get("on")
+    assert set(pipeline_on.keys()) == {"workflow_dispatch"}, (
+        f"pipeline-update.yml must be workflow_dispatch-only, found triggers {sorted(pipeline_on.keys())}"
     )
 
     # 2. Check news collector cron schedule

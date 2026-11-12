@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
 from ml.training.walk_forward_evaluation import run_walk_forward_evaluation
 
 
-def test_walk_forward_evaluation_execution():
-    report = run_walk_forward_evaluation()
+def test_walk_forward_evaluation_execution(tmp_path: Path):
+    report = run_walk_forward_evaluation(report_path=tmp_path / "evaluation_report.json")
     assert isinstance(report, dict)
     assert "status" in report
     assert "dataset_metadata" in report

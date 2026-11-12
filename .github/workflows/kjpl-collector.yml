@@ -3,16 +3,11 @@ name: KJPL Rate Collector
 on:
   schedule:
     # All times in UTC (IST = UTC + 5:30)
-    # Target publication windows:
-    #   Morning Window : ~10:15 AM - 11:30 AM IST (KJPL morning rate published ~09:30-10:00 AM)
-    #   Evening Window : ~05:15 PM - 06:30 PM IST (KJPL evening rate published ~04:30-05:30 PM)
-
-    # Morning target window (~10:15 AM - 11:30 AM IST) - pre-shifted for runner backlog:
+    # Pipeline A: Scheduled MJDTA Reference Price Collector (~twice daily IST windows)
     - cron: '38 0 * * *'   # Morning early backup
     - cron: '8 1 * * *'    # Morning primary
     - cron: '38 1 * * *'   # Morning late backup
 
-    # Evening target window (~05:15 PM - 06:40 PM IST) - pre-shifted:
     - cron: '38 7 * * *'   # Evening early backup
     - cron: '8 8 * * *'    # Evening primary
     - cron: '38 8 * * *'   # Evening late backup
@@ -24,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   collect-kjpl:
@@ -34,49 +29,49 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install collector dependencies
         run: |
           python -m pip install --upgrade pip --retries 5 --timeout 30
-          pip install --retries 5 --timeout 30 requests beautifulsoup4 sqlalchemy pydantic psycopg[binary]
+          pip install --retries 5 --timeout 30 requests beautifulsoup4 lxml sqlalchemy pydantic psycopg[binary] alembic numpy pandas scipy
 
-      - name: Collect KJPL city-wise & benchmark bullion rates
+      - name: Verify Neon schema revision using restricted runtime credentials
         env:
-          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.NEON_RUNTIME_DATABASE_URL }}
+          REQUIRE_POSTGRES: "true"
+          DB_USE_NULLPOOL: "true"
         run: |
-          PYTHONPATH=backend python scripts/collect_kjpl_csv.py
+          test -n "${DATABASE_URL}" || (echo "ERROR: NEON_RUNTIME_DATABASE_URL secret must be set (distinct from migration credentials)." && exit 1)
+          PYTHONPATH=backend python scripts/verify_schema_revision.py
 
-      - name: Commit collected data
+      - name: Pipeline A — Collect MJDTA & LBMA Reference Rates directly to Neon PostgreSQL
+        env:
+          DATABASE_URL: ${{ secrets.NEON_RUNTIME_DATABASE_URL }}
+          REQUIRE_POSTGRES: "true"
+          DB_USE_NULLPOOL: "true"
+          ENABLE_CSV_MIRROR: "false"
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          PYTHONPATH=backend python scripts/collect_kjpl_csv.py --mjdta-only
 
-          git add data/kjpl/kjpl_rates.csv data/kjpl/city_rates.csv
+      - name: Run Prospective Shadow Forecast on Latest MJDTA Origin
+        env:
+          DATABASE_URL: ${{ secrets.NEON_RUNTIME_DATABASE_URL }}
+          REQUIRE_POSTGRES: "true"
+          DB_USE_NULLPOOL: "true"
+        run: |
+          PYTHONPATH=backend python scripts/run_prospective_forecast.py
 
-          if git diff --cached --quiet; then
-            echo "[KJPL WORKFLOW] Rates unchanged. No new observation rows to commit."
-          else
-            git commit -m "data: collect city-wise KJPL bullion rates"
-
-            MAX_RETRIES=6
-            for attempt in $(seq 1 $MAX_RETRIES); do
-              echo "[KJPL WORKFLOW] Push attempt $attempt of $MAX_RETRIES..."
-              if git pull --rebase --autostash origin develop && git push origin HEAD:develop; then
-                echo "[KJPL WORKFLOW] Successfully pushed bullion updates."
-                exit 0
-              fi
-              git rebase --abort 2>/dev/null || true
-              BACKOFF=$((attempt * 3))
-              echo "[KJPL WORKFLOW] Push failed or encountered concurrent update. Retrying in ${BACKOFF}s..."
-              sleep $BACKOFF
-            done
-            echo "[KJPL WORKFLOW] ERROR: Failed to push after $MAX_RETRIES attempts."
-            exit 1
-          fi
+      - name: Interim 5-City One-Time Snapshot (until Oracle continuous worker is active)
+        if: vars.ORACLE_WORKER_ACTIVE != 'true'
+        env:
+          DATABASE_URL: ${{ secrets.NEON_RUNTIME_DATABASE_URL }}
+          REQUIRE_POSTGRES: "true"
+          DB_USE_NULLPOOL: "true"
+          ENABLE_CSV_MIRROR: "false"
+        run: |
+          PYTHONPATH=backend python scripts/collect_kjpl_csv.py --snapshot-only

@@ -1,0 +1,21 @@
+[Unit]
+Description=VMD Bullion FastAPI Backend Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/vmd-bullion/backend
+EnvironmentFile=/etc/vmd-bullion/vmd.env
+Environment="PYTHONPATH=/opt/vmd-bullion/backend"
+ExecStart=/opt/vmd-bullion/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=20
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

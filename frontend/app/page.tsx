@@ -1,6 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { apiUrl, BullionDashboardPayload, fetchBullionDashboard, openBullionEventStream } from "../lib/api";
+import { KjplLiveDeskPanel } from "../components/bullion/KjplLiveDeskPanel";
+import { MjdtaPredictionPanel } from "../components/bullion/MjdtaPredictionPanel";
 
 // =============================================================================
 // TYPES & INTERFACES
@@ -29,16 +32,23 @@ interface CityRateItem {
   age_hours?: number;
   age_display?: string;
   source_url: string;
+  source_product_id?: string | null;
+  validation_status?: string;
 }
 
 interface CityComparisonItem {
   city_code: string;
   city_display_name: string;
+  product_id?: string;
+  source_product_id?: string;
+  purity?: number;
+  unit?: string;
   total_price_100g: number | null;
   per_gram_price: number | null;
   spread_vs_chennai_inr: number | null;
   spread_vs_chennai_pct: number | null;
   is_baseline: boolean;
+  validation_status?: string;
   source_updated_time: string;
   observed_at: string | null;
   last_verified_at: string | null;
@@ -77,18 +87,37 @@ interface BullionSummaryResponse {
     source_updated_time: string;
     freshness: string;
   }>;
+  kjpl_live_terminal?: {
+    spot_gold_usd?: CityRateItem | null;
+    spot_silver_usd?: CityRateItem | null;
+    spot_usdinr?: CityRateItem | null;
+    gold_contract_10g?: CityRateItem | null;
+    silver_contract_1kg?: CityRateItem | null;
+    lbma_gold_am_usd?: CityRateItem | null;
+    lbma_gold_pm_usd?: CityRateItem | null;
+    lbma_silver_usd?: CityRateItem | null;
+  } | null;
   parity: {
+    source: string;
     xauusd: number;
-    xagusd: number;
+    xagusd: number | null;
     usdinr: number;
-    import_cost_per_gram: number;
-    landed_duty_paid_per_gram: number;
-    domestic_premium_inr: number;
-    domestic_premium_pct: number;
+    raw_spot_inr_per_gram: number;
+    domestic_vs_spot_spread_inr: number | null;
+    domestic_vs_spot_spread_pct: number | null;
     market_freshness: string;
+    note?: string;
   } | null;
   timestamp_utc: string;
   timestamp_ist: string;
+}
+
+interface HistoryRecordItem {
+  id: number | string;
+  product_id: string;
+  price: number;
+  observed_at: string;
+  is_changed: boolean;
 }
 
 interface DataMonitorStatus {
@@ -226,7 +255,7 @@ export default function VMDBullionDashboard() {
   const [cityRates, setCityRates] = useState<CityRateItem[]>([]);
   const [cityComparison, setCityComparison] = useState<BullionComparisonResponse | null>(null);
   const [monitorStatus, setMonitorStatus] = useState<DataMonitorStatus | null>(null);
-  const [historyRecords, setHistoryRecords] = useState<any[]>([]);
+  const [historyRecords, setHistoryRecords] = useState<HistoryRecordItem[]>([]);
 
   // News states
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -243,6 +272,9 @@ export default function VMDBullionDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
+  const [streamStatus, setStreamStatus] = useState<{ connected: boolean; degraded?: boolean; message?: string }>({
+    connected: false,
+  });
   const [userId, setUserId] = useState("owner");
   const [apiKey, setApiKey] = useState("");
 
@@ -283,42 +315,32 @@ export default function VMDBullionDashboard() {
   // DATA FETCHING
   // ===========================================================================
 
-  const fetchBullionData = async () => {
+  const applyDashboardPayload = useCallback((dash: BullionDashboardPayload | null | undefined) => {
+    if (!dash) return;
+    if (dash.summary) setBullionSummary(dash.summary as BullionSummaryResponse);
+    if (Array.isArray(dash.cities)) setBullionCities(dash.cities as BullionCity[]);
+    if (Array.isArray(dash.city_rates)) setCityRates(dash.city_rates as CityRateItem[]);
+    if (dash.comparison) setCityComparison(dash.comparison as BullionComparisonResponse);
+    if (dash.monitor) setMonitorStatus(dash.monitor as DataMonitorStatus);
+    if (Array.isArray(dash.history)) setHistoryRecords(dash.history as HistoryRecordItem[]);
+  }, []);
+
+  const fetchBullionData = useCallback(async () => {
     try {
-      // 1. Summary
-      const sumRes = await fetch("/api/bullion/latest");
-      if (sumRes.ok) setBullionSummary(await sumRes.json());
-
-      // 2. Cities
-      const citiesRes = await fetch("/api/bullion/cities");
-      if (citiesRes.ok) setBullionCities(await citiesRes.json());
-
-      // 3. City rates
-      const ratesRes = await fetch("/api/bullion/city-rates");
-      if (ratesRes.ok) setCityRates(await ratesRes.json());
-
-      // 4. City comparison matrix
-      const compRes = await fetch("/api/bullion/comparison");
-      if (compRes.ok) setCityComparison(await compRes.json());
-
-      // 5. Data monitor
-      const monRes = await fetch("/api/data-monitor/status");
-      if (monRes.ok) setMonitorStatus(await monRes.json());
-
-      // 6. History for selected city
-      const histRes = await fetch(`/api/bullion/history?city=${selectedCity}&limit=20`);
-      if (histRes.ok) setHistoryRecords(await histRes.json());
+      const dash = await fetchBullionDashboard(selectedCity, 30);
+      applyDashboardPayload(dash);
     } catch (e) {
-      console.error("Error fetching bullion data", e);
+      console.error("Error fetching consolidated bullion dashboard", e);
+      setStreamStatus({ connected: false, degraded: true, message: "Backend API unreachable" });
     }
-  };
+  }, [selectedCity, applyDashboardPayload]);
 
-  const fetchNewsData = async (windowHours: number) => {
+  const fetchNewsData = useCallback(async (windowHours: number) => {
     try {
-      const sigRes = await fetch(`/api/news/live-signal?window_hours=${windowHours}`);
+      const sigRes = await fetch(apiUrl(`/api/news/live-signal?window_hours=${windowHours}`));
       if (sigRes.ok) setLiveNewsSignal(await sigRes.json());
 
-      const newsRes = await fetch(`/api/news/latest?window_hours=${windowHours}&limit=50`);
+      const newsRes = await fetch(apiUrl(`/api/news/latest?window_hours=${windowHours}&limit=50`));
       if (newsRes.ok) {
         const json = await newsRes.json();
         setNews(Array.isArray(json) ? json : json.articles || []);
@@ -326,40 +348,63 @@ export default function VMDBullionDashboard() {
     } catch (e) {
       console.error("Error fetching news", e);
     }
-  };
+  }, []);
 
-  const fetchPortfolioAndAlerts = async () => {
+  const fetchPortfolioAndAlerts = useCallback(async () => {
     try {
-      const headers = getHeaders();
-      const pfRes = await fetch("/api/portfolio/summary", { headers });
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (userId) headers["X-User-ID"] = userId;
+      if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
+      const pfRes = await fetch(apiUrl("/api/portfolio/summary"), { headers });
       if (pfRes.ok) setPortfolioSummary(await pfRes.json());
 
-      const hldRes = await fetch("/api/portfolio/holdings", { headers });
+      const hldRes = await fetch(apiUrl("/api/portfolio/holdings"), { headers });
       if (hldRes.ok) setHoldings(await hldRes.json());
 
-      const alRes = await fetch("/api/alerts", { headers });
+      const alRes = await fetch(apiUrl("/api/alerts"), { headers });
       if (alRes.ok) setAlerts(await alRes.json());
     } catch (e) {
       console.error("Error fetching portfolio/alerts", e);
     }
-  };
-
-  const loadAll = async () => {
-    setIsLoading(true);
-    await Promise.all([fetchBullionData(), fetchNewsData(newsWindowHours), fetchPortfolioAndAlerts()]);
-    setIsLoading(false);
-  };
-
-  useEffect(() => {
-    loadAll();
   }, [userId, apiKey]);
 
   useEffect(() => {
-    fetchNewsData(newsWindowHours);
-  }, [newsWindowHours]);
+    let active = true;
+    const syncInitial = async () => {
+      await Promise.all([fetchBullionData(), fetchPortfolioAndAlerts()]);
+      if (active) {
+        setIsLoading(false);
+      }
+    };
+    void syncInitial();
+    return () => {
+      active = false;
+    };
+  }, [fetchBullionData, fetchPortfolioAndAlerts]);
 
   useEffect(() => {
-    fetch(`/api/bullion/history?city=${selectedCity}&limit=20`)
+    const closeStream = openBullionEventStream(
+      (dash) => applyDashboardPayload(dash),
+      (st) => setStreamStatus(st)
+    );
+    return () => closeStream();
+  }, [applyDashboardPayload]);
+
+  useEffect(() => {
+    let active = true;
+    const refreshNews = async () => {
+      if (!active) return;
+      await fetchNewsData(newsWindowHours);
+    };
+    void refreshNews();
+    return () => {
+      active = false;
+    };
+  }, [newsWindowHours, fetchNewsData]);
+
+  useEffect(() => {
+    fetch(apiUrl(`/api/bullion/history?city=${selectedCity}&limit=20`))
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setHistoryRecords(data))
       .catch(() => {});
@@ -370,16 +415,10 @@ export default function VMDBullionDashboard() {
     setIsRefreshing(true);
     setRefreshNotice(null);
     try {
-      const res = await fetch("/api/market/refresh", { method: "POST" });
-      const data = await res.json();
-      if (data.refreshed === false) {
-        setRefreshNotice(data.message || "Market cooldown active (60s). Rates retained.");
-      } else {
-        setRefreshNotice("Market & bullion observations updated.");
-      }
       await fetchBullionData();
-    } catch (e) {
-      setRefreshNotice("Data refreshed with verified cache.");
+      setRefreshNotice("Verified KJPL database state synced.");
+    } catch {
+      setRefreshNotice("Sync failed: database or backend unavailable.");
     } finally {
       setIsRefreshing(false);
       setTimeout(() => setRefreshNotice(null), 4000);
@@ -401,7 +440,7 @@ export default function VMDBullionDashboard() {
         acquisition_cost_inr: holdingForm.acquisition_cost_inr ? parseFloat(holdingForm.acquisition_cost_inr) : null,
         notes: holdingForm.notes,
       };
-      const res = await fetch("/api/portfolio/holdings", {
+      const res = await fetch(apiUrl("/api/portfolio/holdings"), {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify(payload),
@@ -430,7 +469,7 @@ export default function VMDBullionDashboard() {
         acquisition_cost_inr: holdingForm.acquisition_cost_inr ? parseFloat(holdingForm.acquisition_cost_inr) : null,
         notes: holdingForm.notes,
       };
-      const res = await fetch(`/api/portfolio/holdings/${editingHolding.id}`, {
+      const res = await fetch(apiUrl(`/api/portfolio/holdings/${editingHolding.id}`), {
         method: "PUT",
         headers: getHeaders(),
         body: JSON.stringify(payload),
@@ -448,7 +487,7 @@ export default function VMDBullionDashboard() {
   const handleDeleteHolding = async (id: number) => {
     if (!confirm("Remove this bullion holding from your vault?")) return;
     try {
-      const res = await fetch(`/api/portfolio/holdings/${id}`, {
+      const res = await fetch(apiUrl(`/api/portfolio/holdings/${id}`), {
         method: "DELETE",
         headers: getHeaders(),
       });
@@ -484,7 +523,7 @@ export default function VMDBullionDashboard() {
         threshold: parseFloat(alertForm.threshold),
         notes: alertForm.notes,
       };
-      const res = await fetch("/api/alerts", {
+      const res = await fetch(apiUrl("/api/alerts"), {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify(payload),
@@ -500,7 +539,7 @@ export default function VMDBullionDashboard() {
 
   const handleDeleteAlert = async (id: number) => {
     try {
-      const res = await fetch(`/api/alerts/${id}`, {
+      const res = await fetch(apiUrl(`/api/alerts/${id}`), {
         method: "DELETE",
         headers: getHeaders(),
       });
@@ -535,6 +574,13 @@ export default function VMDBullionDashboard() {
 
   const getFreshnessBadge = (status: string | undefined) => {
     const s = (status || "").toUpperCase();
+    if (s === "LIVE") {
+      return (
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-950 text-emerald-300 border border-emerald-700 animate-pulse">
+          ● LIVE
+        </span>
+      );
+    }
     if (s === "FRESH") {
       return (
         <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800">
@@ -546,6 +592,27 @@ export default function VMDBullionDashboard() {
       return (
         <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-950 text-amber-400 border border-amber-800">
           ▲ DELAYED
+        </span>
+      );
+    }
+    if (s === "MARKET_CLOSED") {
+      return (
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-zinc-900 text-zinc-300 border border-zinc-700">
+          ⏸ CLOSED
+        </span>
+      );
+    }
+    if (s === "SOURCE_UNAVAILABLE" || s === "UNAVAILABLE") {
+      return (
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-zinc-900 text-amber-300 border border-amber-800/70">
+          ⚠ UNAVAILABLE
+        </span>
+      );
+    }
+    if (s === "QUARANTINED") {
+      return (
+        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-rose-950 text-rose-300 border border-rose-700">
+          ⊘ QUARANTINED
         </span>
       );
     }
@@ -588,12 +655,20 @@ export default function VMDBullionDashboard() {
 
           {/* Engine & Connection Status */}
           <div className="flex items-center gap-2 sm:gap-4 text-xs font-mono">
+            <span className="px-2 py-0.5 rounded text-[11px] bg-[#111820] border border-[#25313D] text-[#8B98A5] flex items-center gap-1.5">
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  streamStatus.connected && !streamStatus.degraded ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
+                }`}
+              />
+              {streamStatus.connected && !streamStatus.degraded ? "SSE LIVE" : "POLLING"}
+            </span>
             {monitorStatus?.database ? (
               <span className="px-2 py-0.5 rounded text-[11px] bg-[#111820] border border-[#25313D] text-[#8B98A5] flex items-center gap-1.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${monitorStatus.database.connected ? "bg-emerald-400" : "bg-rose-400"}`} />
-                {monitorStatus.database.engine.toUpperCase()}{" "}
+                {monitorStatus.database.engine ? monitorStatus.database.engine.toUpperCase() : "DB"}{" "}
                 <span className="text-[9px] text-zinc-500">
-                  {monitorStatus.database.is_production_ready ? "PROD" : "DEV"}
+                  {monitorStatus.database.is_production_ready ? "NEON" : "DEV"}
                 </span>
               </span>
             ) : null}
@@ -637,26 +712,30 @@ export default function VMDBullionDashboard() {
               </div>
             ))}
 
-            {/* International Parity & Forex */}
+            {/* International Parity & Forex (KJPL Exclusive) */}
             {bullionSummary?.parity && (
               <>
                 <div className="flex items-center gap-1.5 pl-3 border-l border-[#25313D]">
-                  <span className="text-[#8B98A5]">XAU/USD:</span>
+                  <span className="text-[#8B98A5]">KJPL SPOT ($):</span>
                   <span className="font-semibold text-white">${formatINR(bullionSummary.parity.xauusd, 2)}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[#8B98A5]">USD/INR:</span>
+                  <span className="text-[#8B98A5]">KJPL INR:</span>
                   <span className="font-semibold text-white">₹{formatINR(bullionSummary.parity.usdinr, 2)}</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#8B98A5]">PREMIUM:</span>
-                  <span
-                    className={`font-semibold ${bullionSummary.parity.domestic_premium_inr >= 0 ? "text-emerald-400" : "text-rose-400"}`}
-                  >
-                    {bullionSummary.parity.domestic_premium_inr >= 0 ? "+" : ""}
-                    ₹{formatINR(bullionSummary.parity.domestic_premium_inr, 1)}/g
-                  </span>
-                </div>
+                {bullionSummary.parity.domestic_vs_spot_spread_inr !== null && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[#8B98A5]">SPREAD:</span>
+                    <span
+                      className={`font-semibold ${
+                        bullionSummary.parity.domestic_vs_spot_spread_inr >= 0 ? "text-emerald-400" : "text-rose-400"
+                      }`}
+                    >
+                      {bullionSummary.parity.domestic_vs_spot_spread_inr >= 0 ? "+" : ""}
+                      ₹{formatINR(bullionSummary.parity.domestic_vs_spot_spread_inr, 1)}/g
+                    </span>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -680,7 +759,7 @@ export default function VMDBullionDashboard() {
             { id: "india-bullion", label: "INDIA BULLION (5 CITIES)", key: "F2", highlight: true },
             { id: "markets", label: "GLOBAL MARKETS & PARITY", key: "F3" },
             { id: "news", label: "NEWS INTELLIGENCE", key: "F4" },
-            { id: "analytics", label: "ARBITRAGE & SPREADS", key: "F5" },
+            { id: "analytics", label: "ARBITRAGE & MJDTA FORECAST", key: "F5" },
             { id: "vault", label: "PORTFOLIO VAULT", key: "F6" },
             { id: "alerts", label: "ALERTS", key: "F7" },
             { id: "data-monitor", label: "DATA MONITOR", key: "F8" },
@@ -804,7 +883,7 @@ export default function VMDBullionDashboard() {
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <div className="text-[10px] font-mono uppercase text-[#D6A84F] font-bold tracking-wider">
-                          COMMERCIAL WHOLESALE
+                          COMMERCIAL WHOLESALE (ID 47)
                         </div>
                         <h3 className="text-sm font-semibold text-white">Gold 1KG 99.99 Pure Bar</h3>
                       </div>
@@ -814,63 +893,64 @@ export default function VMDBullionDashboard() {
                     </div>
 
                     <div className="mt-3 flex items-baseline gap-2">
-                      <span className="text-xl sm:text-2xl font-mono font-bold text-white tracking-tight">
-                        ₹{formatINR(bullionSummary?.wholesale_gold_1kg?.latest_price, 0)}
-                      </span>
-                    </div>
-
-                    <div className="mt-2 text-xs font-mono text-zinc-400 flex items-center justify-between border-t border-[#25313D]/60 pt-2">
-                      <span>Per-gram wholesale:</span>
-                      <span className="text-[#D6A84F] font-semibold">
-                        ₹{formatINR(bullionSummary?.wholesale_gold_1kg?.per_gram_price)}/g
-                      </span>
-                    </div>
-
-                    <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-zinc-500">
-                      <span>Standard: 1,000g Cast Bar</span>
-                      <span>Pub: {bullionSummary?.wholesale_gold_1kg?.source_updated_time || "N/A"}</span>
-                    </div>
-                  </div>
-
-                  {/* Card 4: Import Parity & Domestic Premium */}
-                  <div className="bg-[#111820] border border-[#25313D] rounded-lg p-4 relative overflow-hidden hover:border-emerald-500/40 transition">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <div className="text-[10px] font-mono uppercase text-emerald-400 font-bold tracking-wider">
-                          PARITY ARBITRAGE
-                        </div>
-                        <h3 className="text-sm font-semibold text-white">Landed Duty-Paid Parity</h3>
-                      </div>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-300">
-                        DUTY 6% + 1%
-                      </span>
-                    </div>
-
-                    <div className="mt-3 flex items-baseline gap-2">
                       <span className="text-2xl sm:text-3xl font-mono font-bold text-white tracking-tight">
-                        ₹{formatINR(bullionSummary?.parity?.landed_duty_paid_per_gram)}
+                        ₹{formatINR(bullionSummary?.wholesale_gold_1kg?.per_gram_price)}
                       </span>
                       <span className="text-xs font-mono text-[#8B98A5]">/ gram</span>
                     </div>
 
                     <div className="mt-2 text-xs font-mono text-zinc-400 flex items-center justify-between border-t border-[#25313D]/60 pt-2">
-                      <span>Domestic Premium:</span>
-                      <span
-                        className={`font-semibold ${
-                          (bullionSummary?.parity?.domestic_premium_inr || 0) >= 0
-                            ? "text-emerald-400"
-                            : "text-rose-400"
-                        }`}
-                      >
-                        {(bullionSummary?.parity?.domestic_premium_inr || 0) >= 0 ? "+" : ""}
-                        ₹{formatINR(bullionSummary?.parity?.domestic_premium_inr)}/g (
-                        {bullionSummary?.parity?.domestic_premium_pct}%)
+                      <span>1 KG Bar Equiv (1,000g):</span>
+                      <span className="text-[#D6A84F] font-semibold">
+                        ₹{bullionSummary?.wholesale_gold_1kg?.per_gram_price
+                          ? formatINR(bullionSummary.wholesale_gold_1kg.per_gram_price * 1000, 0)
+                          : "—"}
                       </span>
                     </div>
 
                     <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-zinc-500">
-                      <span>COMEX: ${bullionSummary?.parity?.xauusd}</span>
-                      <span>USD/INR: ₹{bullionSummary?.parity?.usdinr}</span>
+                      <span>Unit: {bullionSummary?.wholesale_gold_1kg?.unit || "1g"}</span>
+                      <span>Pub: {bullionSummary?.wholesale_gold_1kg?.source_updated_time || "N/A"}</span>
+                    </div>
+                  </div>
+
+                  {/* Card 4: KJPL Spot Conversion & Domestic Spread */}
+                  <div className="bg-[#111820] border border-[#25313D] rounded-lg p-4 relative overflow-hidden hover:border-emerald-500/40 transition">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <div className="text-[10px] font-mono uppercase text-emerald-400 font-bold tracking-wider">
+                          KJPL RAW SPOT PARITY
+                        </div>
+                        <h3 className="text-sm font-semibold text-white">KJPL Spot Conversion (INR/g)</h3>
+                      </div>
+                      {getFreshnessBadge(bullionSummary?.parity?.market_freshness || "SOURCE_UNAVAILABLE")}
+                    </div>
+
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="text-2xl sm:text-3xl font-mono font-bold text-white tracking-tight">
+                        ₹{formatINR(bullionSummary?.parity?.raw_spot_inr_per_gram)}
+                      </span>
+                      <span className="text-xs font-mono text-[#8B98A5]">/ gram (raw)</span>
+                    </div>
+
+                    <div className="mt-2 text-xs font-mono text-zinc-400 flex items-center justify-between border-t border-[#25313D]/60 pt-2">
+                      <span>MJDTA vs Spot Spread:</span>
+                      <span
+                        className={`font-semibold ${
+                          (bullionSummary?.parity?.domestic_vs_spot_spread_inr || 0) >= 0
+                            ? "text-emerald-400"
+                            : "text-rose-400"
+                        }`}
+                      >
+                        {(bullionSummary?.parity?.domestic_vs_spot_spread_inr || 0) >= 0 ? "+" : ""}
+                        ₹{formatINR(bullionSummary?.parity?.domestic_vs_spot_spread_inr)}/g (
+                        {bullionSummary?.parity?.domestic_vs_spot_spread_pct ?? "—"}%)
+                      </span>
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-zinc-500">
+                      <span>KJPL GOLD ($): ${bullionSummary?.parity?.xauusd ?? "—"}</span>
+                      <span>KJPL INR: ₹{bullionSummary?.parity?.usdinr ?? "—"}</span>
                     </div>
                   </div>
                 </div>
@@ -882,11 +962,11 @@ export default function VMDBullionDashboard() {
                       <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                         <span>5-CITY RETAIL BULLION MATRIX</span>
                         <span className="text-[11px] font-mono px-2 py-0.5 bg-[#D6A84F]/10 text-[#D6A84F] border border-[#D6A84F]/30 rounded">
-                          GOLD 100 GMS 999
+                          KJPL #48–52 (1G QUOTE)
                         </span>
                       </h2>
                       <p className="text-xs font-mono text-[#8B98A5] mt-0.5">
-                        Verified Kundanmal Jhabak rates normalized to ₹/gram with Chennai baseline spread.
+                        Independent KJPL city rates (&ldquo;GOLD 100 GMS 999&rdquo; titles quoted directly in ₹/1g, com_weight=1.000; 100g equiv for display only).
                       </p>
                     </div>
 
@@ -904,17 +984,21 @@ export default function VMDBullionDashboard() {
                       <thead>
                         <tr className="border-b border-[#25313D] text-[#8B98A5]">
                           <th className="py-2.5 px-3">CITY</th>
-                          <th className="py-2.5 px-3">STATE</th>
-                          <th className="py-2.5 px-3 text-right">TOTAL 100G RATE</th>
-                          <th className="py-2.5 px-3 text-right">EQUIVALENT (₹/G)</th>
+                          <th className="py-2.5 px-3">SRC ID</th>
+                          <th className="py-2.5 px-3">PURITY / UNIT</th>
+                          <th className="py-2.5 px-3 text-right">RATE (₹/G)</th>
+                          <th className="py-2.5 px-3 text-right">100G EQUIV</th>
                           <th className="py-2.5 px-3 text-right">SPREAD VS CHENNAI</th>
                           <th className="py-2.5 px-3">SOURCE TIMESTAMP</th>
                           <th className="py-2.5 px-3">FRESHNESS</th>
+                          <th className="py-2.5 px-3">VALIDATION</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#25313D]/50">
                         {cityComparison?.cities?.map((c) => {
                           const isChennai = c.city_code === "CHENNAI";
+                          const hasRate = c.per_gram_price !== null && c.per_gram_price !== undefined;
+                          const valStatus = c.validation_status || (hasRate ? "VALID" : "SOURCE_UNAVAILABLE");
                           return (
                             <tr
                               key={c.city_code}
@@ -926,42 +1010,63 @@ export default function VMDBullionDashboard() {
                                 isChennai ? "bg-[#D6A84F]/5" : ""
                               }`}
                             >
-                              <td className="py-3 px-3 font-semibold text-white flex items-center gap-2">
-                                <span>{c.city_display_name}</span>
-                                {isChennai && (
-                                  <span className="text-[9px] px-1 py-0.2 rounded bg-[#D6A84F] text-black font-bold">
-                                    BASELINE
-                                  </span>
-                                )}
+                              <td className="py-3 px-3 font-semibold text-white">
+                                <div className="flex items-center gap-2">
+                                  <span>{c.city_display_name}</span>
+                                  {isChennai && (
+                                    <span className="text-[9px] px-1 py-0.2 rounded bg-[#D6A84F] text-black font-bold">
+                                      BASELINE
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-[#8795A3] font-normal">
+                                  {bullionCities.find((bc) => bc.city_code === c.city_code)?.state || "India"}
+                                </div>
                               </td>
-                              <td className="py-3 px-3 text-[#8B98A5]">
-                                {bullionCities.find((bc) => bc.city_code === c.city_code)?.state || "India"}
+                              <td className="py-3 px-3 text-[#8795A3]">
+                                KJPL #{c.source_product_id || "—"}
                               </td>
-                              <td className="py-3 px-3 text-right font-bold text-white">
-                                ₹{formatINR(c.total_price_100g, 0)}
+                              <td className="py-3 px-3 text-zinc-300">
+                                {c.purity ? (c.purity * 100).toFixed(1) : "99.9"}% &bull; {c.unit || "1g"}
                               </td>
                               <td className="py-3 px-3 text-right font-bold text-[#D6A84F]">
-                                ₹{formatINR(c.per_gram_price)}/g
+                                {hasRate ? `₹${formatINR(c.per_gram_price)}/g` : "Unavailable"}
+                              </td>
+                              <td className="py-3 px-3 text-right font-bold text-white">
+                                {hasRate ? `₹${formatINR(c.total_price_100g, 0)}` : "—"}
                               </td>
                               <td
                                 className={`py-3 px-3 text-right font-semibold ${
-                                  isChennai
+                                  !hasRate || isChennai
                                     ? "text-zinc-500"
                                     : (c.spread_vs_chennai_inr || 0) >= 0
-                                    ? "text-emerald-400"
-                                    : "text-rose-400"
+                                    ? "text-[#19B47A]"
+                                    : "text-[#E05A5A]"
                                 }`}
                               >
                                 {isChennai
                                   ? "BASELINE (₹0.00)"
-                                  : `${(c.spread_vs_chennai_inr || 0) >= 0 ? "+" : ""}₹${formatINR(
+                                  : hasRate && c.spread_vs_chennai_inr !== null
+                                  ? `${c.spread_vs_chennai_inr >= 0 ? "+" : ""}₹${formatINR(
                                       c.spread_vs_chennai_inr
-                                    )}/g (${(c.spread_vs_chennai_pct || 0) >= 0 ? "+" : ""}${c.spread_vs_chennai_pct}%)`}
+                                    )}/g (${(c.spread_vs_chennai_pct || 0) >= 0 ? "+" : ""}${c.spread_vs_chennai_pct ?? 0}%)`
+                                  : "Unavailable"}
                               </td>
                               <td className="py-3 px-3 text-zinc-400">
-                                {c.source_updated_time || "N/A"}
+                                {c.source_updated_time || "Unavailable"}
                               </td>
                               <td className="py-3 px-3">{getFreshnessBadge(c.freshness)}</td>
+                              <td className="py-3 px-3">
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                    valStatus === "VALID"
+                                      ? "bg-[#19B47A]/15 text-[#19B47A] border border-[#19B47A]/30"
+                                      : "bg-zinc-800 text-zinc-400 border border-[#25313D]"
+                                  }`}
+                                >
+                                  {valStatus}
+                                </span>
+                              </td>
                             </tr>
                           );
                         })}
@@ -1184,6 +1289,7 @@ export default function VMDBullionDashboard() {
                             <h4 className="text-sm font-bold text-white mt-1.5">{prod.product_name}</h4>
                             <p className="text-[11px] font-mono text-[#8B98A5]">
                               Purity: {(prod.purity * 100).toFixed(1)}% &bull; Unit: {prod.unit}
+                              {prod.source_product_id ? ` • KJPL #${prod.source_product_id}` : ""}
                             </p>
                           </div>
                           {getFreshnessBadge(prod.freshness)}
@@ -1191,9 +1297,9 @@ export default function VMDBullionDashboard() {
 
                         <div className="pt-2 border-t border-[#25313D]/60 flex items-baseline justify-between">
                           <div>
-                            <span className="text-[10px] font-mono text-[#8B98A5] block">CONTRACT PRICE</span>
+                            <span className="text-[10px] font-mono text-[#8B98A5] block">QUOTED SOURCE PRICE</span>
                             <span className="text-2xl font-mono font-bold text-white tracking-tight">
-                              ₹{formatINR(prod.latest_price, 0)}
+                              ₹{formatINR(prod.latest_price, prod.latest_price >= 100000 ? 0 : 2)}
                             </span>
                           </div>
                           <div className="text-right">
@@ -1206,6 +1312,12 @@ export default function VMDBullionDashboard() {
 
                         {/* Separate Timestamps */}
                         <div className="p-2.5 rounded bg-[#0D1218] border border-[#25313D] text-[10px] font-mono space-y-1">
+                          <div className="flex justify-between text-zinc-400">
+                            <span>Validation Status:</span>
+                            <strong className={prod.validation_status === "VALID" ? "text-[#19B47A]" : "text-[#D6A84F]"}>
+                              {prod.validation_status || "VALID"}
+                            </strong>
+                          </div>
                           <div className="flex justify-between text-zinc-400">
                             <span>Source Publication Time:</span>
                             <strong className="text-white">{prod.source_updated_time || "N/A"}</strong>
@@ -1248,11 +1360,11 @@ export default function VMDBullionDashboard() {
                     <h3 className="text-sm font-bold text-white uppercase font-mono flex items-center gap-2">
                       <span>5-CITY SIDE-BY-SIDE EQUIVALENT COMPARISON MATRIX</span>
                       <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">
-                        PRODUCT: GOLD 100 GMS 999
+                        KJPL #48–52: GOLD 100 GMS 999 (1G QUOTE)
                       </span>
                     </h3>
                     <p className="text-xs font-mono text-[#8B98A5] mt-1">
-                      Compares standard retail wholesale 100g 999 bar normalized to per-gram price against Chennai baseline.
+                      Independent KJPL 999 city quotes received in ₹/1g (100g column is ₹/g × 100 display equivalent only).
                     </p>
                   </div>
 
@@ -1261,17 +1373,22 @@ export default function VMDBullionDashboard() {
                       <thead>
                         <tr className="border-b border-[#25313D] text-[#8B98A5]">
                           <th className="py-2.5 px-3">CITY</th>
-                          <th className="py-2.5 px-3 text-right">TOTAL 100G (₹)</th>
-                          <th className="py-2.5 px-3 text-right">EQUIVALENT (₹/G)</th>
-                          <th className="py-2.5 px-3 text-right">DIFF VS CHENNAI (₹/G)</th>
+                          <th className="py-2.5 px-3">SRC ID</th>
+                          <th className="py-2.5 px-3">PURITY / UNIT</th>
+                          <th className="py-2.5 px-3 text-right">RATE (₹/G)</th>
+                          <th className="py-2.5 px-3 text-right">100G EQUIV (₹)</th>
+                          <th className="py-2.5 px-3 text-right">DIFF VS CHENNAI</th>
                           <th className="py-2.5 px-3 text-right">SPREAD (%)</th>
                           <th className="py-2.5 px-3">SOURCE TIME</th>
                           <th className="py-2.5 px-3">FRESHNESS</th>
+                          <th className="py-2.5 px-3">STATUS</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#25313D]/50">
                         {cityComparison?.cities?.map((c) => {
                           const isChennai = c.city_code === "CHENNAI";
+                          const hasRate = c.per_gram_price !== null && c.per_gram_price !== undefined;
+                          const valStatus = c.validation_status || (hasRate ? "VALID" : "SOURCE_UNAVAILABLE");
                           return (
                             <tr
                               key={c.city_code}
@@ -1287,42 +1404,61 @@ export default function VMDBullionDashboard() {
                                   </span>
                                 )}
                               </td>
-                              <td className="py-3 px-3 text-right font-bold text-white">
-                                ₹{formatINR(c.total_price_100g, 0)}
+                              <td className="py-3 px-3 text-[#8795A3]">#{c.source_product_id || "—"}</td>
+                              <td className="py-3 px-3 text-zinc-300">
+                                {c.purity ? (c.purity * 100).toFixed(1) : "99.9"}% &bull; {c.unit || "1g"}
                               </td>
                               <td className="py-3 px-3 text-right font-bold text-[#D6A84F]">
-                                ₹{formatINR(c.per_gram_price)}/g
+                                {hasRate ? `₹${formatINR(c.per_gram_price)}/g` : "Unavailable"}
+                              </td>
+                              <td className="py-3 px-3 text-right font-bold text-white">
+                                {hasRate ? `₹${formatINR(c.total_price_100g, 0)}` : "—"}
                               </td>
                               <td
                                 className={`py-3 px-3 text-right ${
-                                  isChennai
+                                  !hasRate || isChennai
                                     ? "text-zinc-500"
                                     : (c.spread_vs_chennai_inr || 0) >= 0
-                                    ? "text-emerald-400 font-bold"
-                                    : "text-rose-400 font-bold"
+                                    ? "text-[#19B47A] font-bold"
+                                    : "text-[#E05A5A] font-bold"
                                 }`}
                               >
                                 {isChennai
                                   ? "₹0.00"
-                                  : `${(c.spread_vs_chennai_inr || 0) >= 0 ? "+" : ""}₹${formatINR(
+                                  : hasRate && c.spread_vs_chennai_inr !== null
+                                  ? `${c.spread_vs_chennai_inr >= 0 ? "+" : ""}₹${formatINR(
                                       c.spread_vs_chennai_inr
-                                    )}/g`}
+                                    )}/g`
+                                  : "Unavailable"}
                               </td>
                               <td
                                 className={`py-3 px-3 text-right ${
-                                  isChennai
+                                  !hasRate || isChennai
                                     ? "text-zinc-500"
                                     : (c.spread_vs_chennai_pct || 0) >= 0
-                                    ? "text-emerald-400"
-                                    : "text-rose-400"
+                                    ? "text-[#19B47A] font-bold"
+                                    : "text-[#E05A5A] font-bold"
                                 }`}
                               >
                                 {isChennai
                                   ? "0.000%"
-                                  : `${(c.spread_vs_chennai_pct || 0) >= 0 ? "+" : ""}${c.spread_vs_chennai_pct}%`}
+                                  : hasRate && c.spread_vs_chennai_pct !== null
+                                  ? `${c.spread_vs_chennai_pct >= 0 ? "+" : ""}${c.spread_vs_chennai_pct}%`
+                                  : "—"}
                               </td>
-                              <td className="py-3 px-3 text-zinc-400">{c.source_updated_time || "N/A"}</td>
+                              <td className="py-3 px-3 text-zinc-400">{c.source_updated_time || "Unavailable"}</td>
                               <td className="py-3 px-3">{getFreshnessBadge(c.freshness)}</td>
+                              <td className="py-3 px-3">
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                    valStatus === "VALID"
+                                      ? "bg-[#19B47A]/15 text-[#19B47A] border border-[#19B47A]/30"
+                                      : "bg-zinc-800 text-zinc-400 border border-[#25313D]"
+                                  }`}
+                                >
+                                  {valStatus}
+                                </span>
+                              </td>
                             </tr>
                           );
                         })}
@@ -1411,10 +1547,12 @@ export default function VMDBullionDashboard() {
                     </p>
                   </div>
 
+                  <KjplLiveDeskPanel terminal={bullionSummary?.kjpl_live_terminal} renderBadge={getFreshnessBadge} />
+
                   {bullionSummary?.parity ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 font-mono text-xs">
                       <div className="p-4 rounded bg-[#0D1218] border border-[#25313D] space-y-1">
-                        <span className="text-[#8B98A5] text-[10px] block">COMEX GOLD (XAU/USD)</span>
+                        <span className="text-[#8B98A5] text-[10px] block">KJPL SPOT GOLD ($/oz)</span>
                         <span className="text-2xl font-bold text-white tracking-tight">
                           ${formatINR(bullionSummary.parity.xauusd, 2)}
                         </span>
@@ -1422,65 +1560,65 @@ export default function VMDBullionDashboard() {
                       </div>
 
                       <div className="p-4 rounded bg-[#0D1218] border border-[#25313D] space-y-1">
-                        <span className="text-[#8B98A5] text-[10px] block">FOREX RATE (USD/INR)</span>
+                        <span className="text-[#8B98A5] text-[10px] block">KJPL SPOT INR</span>
                         <span className="text-2xl font-bold text-white tracking-tight">
                           ₹{formatINR(bullionSummary.parity.usdinr, 2)}
                         </span>
-                        <span className="text-[10px] text-zinc-500 block">RBI Reference Interbank</span>
+                        <span className="text-[10px] text-zinc-500 block">KJPL Type 1 Feed</span>
                       </div>
 
                       <div className="p-4 rounded bg-[#0D1218] border border-[#25313D] space-y-1">
-                        <span className="text-[#8B98A5] text-[10px] block">LANDED DUTY-PAID COST</span>
+                        <span className="text-[#8B98A5] text-[10px] block">RAW SPOT CONVERSION (INR/g)</span>
                         <span className="text-2xl font-bold text-[#D6A84F] tracking-tight">
-                          ₹{formatINR(bullionSummary.parity.landed_duty_paid_per_gram)}/g
+                          ₹{formatINR(bullionSummary.parity.raw_spot_inr_per_gram)}/g
                         </span>
-                        <span className="text-[10px] text-zinc-500 block">BCD 6% + AIDC 1% included</span>
+                        <span className="text-[10px] text-zinc-500 block">Excludes duties &amp; GST</span>
                       </div>
 
                       <div className="p-4 rounded bg-[#0D1218] border border-[#25313D] space-y-1">
-                        <span className="text-[#8B98A5] text-[10px] block">DOMESTIC SPOT PREMIUM</span>
+                        <span className="text-[#8B98A5] text-[10px] block">MJDTA VS RAW SPOT SPREAD</span>
                         <span
                           className={`text-2xl font-bold tracking-tight ${
-                            bullionSummary.parity.domestic_premium_inr >= 0
+                            (bullionSummary.parity.domestic_vs_spot_spread_inr ?? 0) >= 0
                               ? "text-emerald-400"
                               : "text-rose-400"
                           }`}
                         >
-                          {bullionSummary.parity.domestic_premium_inr >= 0 ? "+" : ""}
-                          ₹{formatINR(bullionSummary.parity.domestic_premium_inr)}/g
+                          {(bullionSummary.parity.domestic_vs_spot_spread_inr ?? 0) >= 0 ? "+" : ""}
+                          ₹{formatINR(bullionSummary.parity.domestic_vs_spot_spread_inr)}/g
                         </span>
                         <span className="text-[10px] text-zinc-500 block">
-                          Spread: {bullionSummary.parity.domestic_premium_pct}%
+                          Spread: {bullionSummary.parity.domestic_vs_spot_spread_pct ?? "—"}%
                         </span>
                       </div>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="p-4 rounded bg-[#0D1218] border border-[#25313D] font-mono text-xs text-amber-300">
+                      KJPL Live Terminal Type 1 quotes (SPOT-GOLD / SPOT-INR) are not yet active in the database. Start the Oracle live KJPL worker to populate real-time spot conversion.
+                    </div>
+                  )}
 
-                  {/* Step-by-step Parity Equation */}
+                  {/* Step-by-step Verified Formula */}
                   <div className="p-4 rounded bg-[#0D1218] border border-[#25313D] font-mono text-xs space-y-2">
-                    <h4 className="text-white font-bold text-xs uppercase text-[#D6A84F]">
-                      Statutory Formula &amp; Duty Structure:
+                    <h4 className="font-bold text-xs uppercase text-[#D6A84F]">
+                      Verified KJPL Spot Conversion (No Unverified Duty Assumptions):
                     </h4>
                     <p className="text-zinc-400 text-[11px] leading-relaxed">
-                      1. Base CIF Value = <code className="text-white">(XAU/USD &times; USD/INR) / 31.1034768</code> ={" "}
+                      1. Raw Spot INR/g = <code className="text-white">(KJPL SPOT-GOLD &times; KJPL SPOT-INR) / 31.1034768</code> ={" "}
                       <strong className="text-white">
-                        ₹{formatINR(bullionSummary?.parity?.import_cost_per_gram)}/g
+                        ₹{formatINR(bullionSummary?.parity?.raw_spot_inr_per_gram)}/g
                       </strong>
                     </p>
                     <p className="text-zinc-400 text-[11px] leading-relaxed">
-                      2. Basic Customs Duty (BCD @ 6.0%) + Agriculture Infrastructure Development Cess (AIDC @ 1.0%) ={" "}
-                      <strong className="text-white">7.0% Total Statutory Import Duty</strong>
-                    </p>
-                    <p className="text-zinc-400 text-[11px] leading-relaxed">
-                      3. Landed Duty-Paid Parity Rate ={" "}
-                      <strong className="text-[#D6A84F]">
-                        ₹{formatINR(bullionSummary?.parity?.landed_duty_paid_per_gram)}/g
-                      </strong>
-                    </p>
-                    <p className="text-zinc-400 text-[11px] leading-relaxed">
-                      4. Domestic Spot Rate (Chennai MJDTA) ={" "}
+                      2. Domestic Reference Rate (Chennai MJDTA) ={" "}
                       <strong className="text-white">
                         ₹{formatINR(bullionSummary?.benchmark_gold_24k?.latest_price)}/g
+                      </strong>
+                    </p>
+                    <p className="text-zinc-400 text-[11px] leading-relaxed">
+                      3. Raw Domestic vs Spot Spread (reflecting customs, GST, and local market premium combined) ={" "}
+                      <strong className="text-[#D6A84F]">
+                        ₹{formatINR(bullionSummary?.parity?.domestic_vs_spot_spread_inr)}/g
                       </strong>
                     </p>
                   </div>
@@ -1682,6 +1820,8 @@ export default function VMDBullionDashboard() {
                     </div>
                   </div>
                 </div>
+
+                <MjdtaPredictionPanel />
               </div>
             )}
 
@@ -1896,7 +2036,7 @@ export default function VMDBullionDashboard() {
             )}
 
             {/* =============================================================== */}
-            {/* TAB 8: DATA MONITOR & SUPABASE STATUS                            */}
+            {/* TAB 8: DATA MONITOR & NEON POSTGRESQL STATUS                    */}
             {/* =============================================================== */}
             {activeTab === "data-monitor" && (
               <div className="space-y-6">
@@ -1925,8 +2065,8 @@ export default function VMDBullionDashboard() {
                       </div>
                       <p className="text-xs text-zinc-300 leading-relaxed">
                         {monitorStatus.database.is_production_ready
-                          ? "Supabase PostgreSQL connected. Cloud multi-tenant persistence is active."
-                          : "Local SQLite fallback active for local development. When ready to activate cloud storage, provide your Supabase PostgreSQL connection string as DATABASE_URL in repository secrets and environment variables."}
+                          ? "Neon PostgreSQL connected via TLS. Verified single-writer persistence is active."
+                          : "Local SQLite active for local development/testing. Production requires Neon PostgreSQL (DATABASE_URL with sslmode=require) and fails closed if missing."}
                       </p>
                     </div>
                   )}

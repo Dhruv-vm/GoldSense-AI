@@ -6,18 +6,23 @@ from fastapi.security import HTTPAuthorizationCredentials
 from app.core import auth
 
 
-def test_auth_disabled_default_user():
-    orig = auth.AUTH_ENABLED
+def test_auth_disabled_default_user_blocks_arbitrary_header():
+    orig_auth = auth.AUTH_ENABLED
+    orig_allow = auth.ALLOW_TEST_USER_HEADER
     try:
         auth.AUTH_ENABLED = False
-        user = auth.get_current_user(credentials=None, x_user_id=None, x_api_key=None)
-        assert user == "owner"
+        auth.ALLOW_TEST_USER_HEADER = False
+        assert auth.get_current_user(credentials=None, x_user_id=None, x_api_key=None) == "owner"
 
-        # Explicit header passes through in dev mode
-        user2 = auth.get_current_user(credentials=None, x_user_id="custom_user", x_api_key=None)
-        assert user2 == "custom_user"
+        # Arbitrary X-User-ID spoofing is ignored in production/default single-user mode
+        assert auth.get_current_user(credentials=None, x_user_id="attacker", x_api_key=None) == "owner"
+
+        # Explicit test harness flag permits header override in isolated unit tests
+        auth.ALLOW_TEST_USER_HEADER = True
+        assert auth.get_current_user(credentials=None, x_user_id="custom_user", x_api_key=None) == "custom_user"
     finally:
-        auth.AUTH_ENABLED = orig
+        auth.AUTH_ENABLED = orig_auth
+        auth.ALLOW_TEST_USER_HEADER = orig_allow
 
 
 def test_auth_enabled_rejects_unauthenticated_and_cross_user():
@@ -27,12 +32,10 @@ def test_auth_enabled_rejects_unauthenticated_and_cross_user():
         auth.AUTH_ENABLED = True
         auth.SERVER_API_KEY = "super_secret_test_key"
 
-        # Missing token raises 401
         with pytest.raises(HTTPException) as exc:
             auth.get_current_user(credentials=None, x_user_id=None, x_api_key=None)
         assert exc.value.status_code == 401
 
-        # Invalid token raises 403
         with pytest.raises(HTTPException) as exc:
             auth.get_current_user(
                 credentials=HTTPAuthorizationCredentials(scheme="Bearer", credentials="wrong_token"),
@@ -41,7 +44,6 @@ def test_auth_enabled_rejects_unauthenticated_and_cross_user():
             )
         assert exc.value.status_code == 403
 
-        # Valid token authorizes as owner
         valid_user = auth.get_current_user(
             credentials=HTTPAuthorizationCredentials(scheme="Bearer", credentials="super_secret_test_key"),
             x_user_id="owner",
@@ -49,7 +51,6 @@ def test_auth_enabled_rejects_unauthenticated_and_cross_user():
         )
         assert valid_user == "owner"
 
-        # Valid token via X-API-Key authorizes successfully as owner
         valid_user2 = auth.get_current_user(
             credentials=None,
             x_user_id=None,
@@ -57,7 +58,6 @@ def test_auth_enabled_rejects_unauthenticated_and_cross_user():
         )
         assert valid_user2 == "owner"
 
-        # Cross-user impersonation attempt: token is valid for owner, but caller requests 'victim_user' -> 403 Forbidden
         with pytest.raises(HTTPException) as exc_spoof:
             auth.get_current_user(
                 credentials=HTTPAuthorizationCredentials(scheme="Bearer", credentials="super_secret_test_key"),
@@ -67,7 +67,6 @@ def test_auth_enabled_rejects_unauthenticated_and_cross_user():
         assert exc_spoof.value.status_code == 403
         assert "Cross-user isolation enforced" in exc_spoof.value.detail
 
-        # Fail closed if server API key is empty/unset in production
         auth.SERVER_API_KEY = ""
         with pytest.raises(HTTPException) as exc_misconfig:
             auth.get_current_user(

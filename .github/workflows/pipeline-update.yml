@@ -1,16 +1,9 @@
 name: Daily Pipeline Update & Evaluation
 
 on:
-  workflow_run:
-    workflows: ["News Data Collector"]
-    types:
-      - completed
-    branches:
-      - develop
-  schedule:
-    # 03:38 PM UTC = 09:08 PM IST
-    # Scheduled fallback recovery path running in the evening after market close.
-    - cron: '38 15 * * *'
+  # F-20: legacy update_pipeline.py is MANUAL-ONLY. It previously ran automatically after
+  # every News Data Collector run and on a daily cron, in parallel with the research
+  # pipeline. Re-enable a trigger only after it is reconciled with EXPERIMENT_PROTOCOL_V1.
   workflow_dispatch:
 
 concurrency:
@@ -18,51 +11,39 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
   actions: read
 
 jobs:
   update-pipeline:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Execute if manually triggered, run via schedule, or if triggered by successful news collection
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'schedule' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    if: github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
-      - name: Sync latest develop commits
+      - name: Verify required historical datasets exist
         run: |
-          git fetch origin develop
-          git checkout -B develop origin/develop
-
-      - name: Verify upstream datasets ready
-        run: |
-          echo "[PIPELINE WORKFLOW] Verifying required upstream datasets exist..."
+          echo "[PIPELINE WORKFLOW] Verifying required historical datasets exist..."
           test -s data/kjpl/kjpl_rates.csv || (echo "ERROR: Missing or empty data/kjpl/kjpl_rates.csv" && exit 1)
-          test -s data/market/market_rates.csv || (echo "ERROR: Missing or empty data/market/market_rates.csv" && exit 1)
           test -s data/news/news_articles.csv || (echo "ERROR: Missing or empty data/news/news_articles.csv" && exit 1)
-          echo "[PIPELINE WORKFLOW] All upstream data artifacts verified ready."
+          echo "[PIPELINE WORKFLOW] Required datasets verified ready (note: Yahoo Finance collector decommissioned)."
 
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
+      - name: Install ML verification dependencies (no yfinance)
         run: |
           python -m pip install --upgrade pip --retries 5 --timeout 30
-          pip install --retries 5 --timeout 30 -r backend/requirements.txt
+          pip install --retries 5 --timeout 30 -r backend/requirements-ml.txt
           pip install --retries 5 --timeout 30 --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
           pip install --retries 5 --timeout 30 transformers
 
-      - name: Run end-to-end pipeline update
+      - name: Run offline ML pipeline update verification
         run: |
           PYTHONPATH=backend python backend/ml/training/update_pipeline.py
 
@@ -70,36 +51,14 @@ jobs:
         run: |
           PYTHONPATH=backend python scripts/validate_pipeline_outputs.py
 
-      - name: Commit updated pipeline artifacts
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Stage only the intended generated artifacts
-          git add backend/ml/data/processed/kjpl_events.csv
-          git add backend/ml/data/processed/market_features.csv
-          git add backend/ml/data/processed/analyzed_news.csv
-          git add backend/ml/data/processed/gold_training_dataset.csv
-          git add backend/ml/data/processed/evaluation_report.json
-
-          if git diff --cached --quiet; then
-            echo "[PIPELINE WORKFLOW] No changes in pipeline outputs to commit."
-          else
-            git commit -m "data: update daily training pipeline and evaluation benchmarks"
-
-            # Safe push with bounded retries and rebase against concurrent collector commits
-            MAX_RETRIES=6
-            for attempt in $(seq 1 $MAX_RETRIES); do
-              echo "[PIPELINE WORKFLOW] Push attempt $attempt of $MAX_RETRIES..."
-              if git pull --rebase --autostash origin develop && git push origin HEAD:develop; then
-                echo "[PIPELINE WORKFLOW] Successfully pushed updated pipeline artifacts."
-                exit 0
-              fi
-              git rebase --abort 2>/dev/null || true
-              BACKOFF=$((attempt * 3))
-              echo "[PIPELINE WORKFLOW] Push failed or encountered concurrent update. Retrying in ${BACKOFF}s..."
-              sleep $BACKOFF
-            done
-            echo "[PIPELINE WORKFLOW] ERROR: Failed to push after $MAX_RETRIES attempts."
-            exit 1
-          fi
+      - name: Upload verified ML evaluation artifacts (read-only CI; no commits to develop)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ml-pipeline-verification
+          retention-days: 7
+          path: |
+            backend/ml/data/processed/kjpl_events.csv
+            backend/ml/data/processed/market_features.csv
+            backend/ml/data/processed/analyzed_news.csv
+            backend/ml/data/processed/gold_training_dataset.csv
+            backend/ml/data/processed/evaluation_report.json
