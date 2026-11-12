@@ -7,6 +7,9 @@ import json, tempfile
 
 from sqlalchemy import select, func
 
+from _db_guard import ensure_disposable_audit_db
+ensure_disposable_audit_db()
+
 import app.db.session as dbs
 import app.models  # noqa
 from app.models.research import NewsLabelRecord, NewsArticleRecord, NewsCollectionRun

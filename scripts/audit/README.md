@@ -17,6 +17,8 @@ These scripts attack the real persistence, forecasting and labelling code paths,
 
 ## Running
 
+> **Database Guard (`_db_guard.py`):** All Python scripts in `scripts/audit/` fail closed if `DATABASE_URL` is unset, points to `data/goldsense.db` (or any non-temporary SQLite path), uses `ENVIRONMENT=production`, or points to a non-local PostgreSQL host (e.g. Neon).
+
 ```bash
 # 1. Start a throwaway PostgreSQL 16 and create an empty database, e.g. vmd_audit
 createdb vmd_audit

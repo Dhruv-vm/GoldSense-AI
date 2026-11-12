@@ -16,6 +16,8 @@ for txt in ("09:34 am", "09:36 am", "12:00 am", "12:30 pm", "11:59 pm"):
     print(f"   now 09:30, page '{txt}' ->", resolved.isoformat() if resolved is not None else "QUARANTINED/UNAVAILABLE (None)")
 
 # Migrated SQLite (triggers on)
+from _db_guard import ensure_disposable_audit_db
+ensure_disposable_audit_db()
 from tests.test_research_forecast_and_leakage import _setup_migrated_sqlite_session
 import app.db.session as dbs
 tmp = Path(tempfile.mkdtemp())

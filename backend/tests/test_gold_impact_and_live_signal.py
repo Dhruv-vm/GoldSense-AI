@@ -15,7 +15,10 @@ from app.services.sentiment.live_signal import (
     parse_utc_timestamp,
 )
 
-client = TestClient(app)
+@pytest.fixture
+def client():
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 def test_cluster_key_normalizes_syndicated_headlines():
@@ -114,7 +117,7 @@ def test_live_news_intelligence_insufficient_fresh_news():
     assert "At least 2 distinct clusters" in res["message"]
 
 
-def test_live_news_signal_api_endpoint():
+def test_live_news_signal_api_endpoint(client):
     res = client.get("/api/news/live-signal?window_hours=24")
     assert res.status_code == 200
     data = res.json()
@@ -128,7 +131,7 @@ def test_live_news_signal_api_endpoint():
     assert isinstance(data["representative_articles"], list)
 
 
-def test_news_latest_endpoint_with_window():
+def test_news_latest_endpoint_with_window(client):
     res = client.get("/api/news/latest?window_hours=24&limit=10")
     assert res.status_code == 200
     articles = res.json()
@@ -141,7 +144,7 @@ def test_news_latest_endpoint_with_window():
         assert "age_display" in art
 
 
-def test_prediction_status_includes_news_intelligence():
+def test_prediction_status_includes_news_intelligence(client):
     res = client.get("/api/predictions/latest")
     assert res.status_code == 200
     data = res.json()

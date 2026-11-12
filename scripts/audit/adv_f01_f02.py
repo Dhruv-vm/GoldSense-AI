@@ -8,6 +8,9 @@ from datetime import timedelta, timezone
 
 from sqlalchemy import select, func, text
 
+from _db_guard import ensure_disposable_audit_db
+ensure_disposable_audit_db()
+
 import app.db.session as dbs
 from app.db.base import Base
 import app.models  # noqa

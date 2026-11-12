@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 from typing import Generator
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
@@ -10,9 +11,12 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+REAL_DEFAULT_DB_PATH = (REPO_ROOT / "data" / "goldsense.db").resolve()
 DEFAULT_DB_DIR = Path("data")
 SQLITE_PATH = Path(os.environ.get("GOLDSENSE_SQLITE_PATH", str(DEFAULT_DB_DIR / "goldsense.db")))
-SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
+if os.environ.get("ENVIRONMENT", "development").lower() != "test":
+    SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
 SQLITE_URL = f"sqlite:///{SQLITE_PATH.resolve()}"
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -43,6 +47,32 @@ def normalize_database_url(url: str | None) -> str | None:
             new_query = urlencode(qs, doseq=True)
             cleaned = urlunparse(parsed._replace(query=new_query))
     return cleaned
+
+
+def _validate_test_sqlite_target(sqlite_target: str) -> None:
+    """Reject non-temporary SQLite paths or the repository's real data/goldsense.db when ENVIRONMENT=test."""
+    raw = sqlite_target.split("?", 1)[0]
+    if raw in {"sqlite://", "sqlite:///:memory:"} or raw.endswith(":memory:"):
+        return
+    if raw.startswith("sqlite:///"):
+        file_part = raw[len("sqlite:///"):]
+    elif raw.startswith("sqlite://"):
+        file_part = raw[len("sqlite://"):]
+    else:
+        file_part = raw
+
+    resolved = Path(file_part).resolve()
+    cwd_real_db = Path("data/goldsense.db").resolve()
+    if resolved == REAL_DEFAULT_DB_PATH or resolved == cwd_real_db or resolved.parent == REAL_DEFAULT_DB_PATH.parent:
+        raise RuntimeError(
+            f"[TEST ISOLATION ERROR] Refusing to open repository database '{resolved}' when ENVIRONMENT=test."
+        )
+
+    temp_roots = (Path(tempfile.gettempdir()).resolve(), Path("/tmp").resolve())
+    if not any(root == resolved or root in resolved.parents for root in temp_roots):
+        raise RuntimeError(
+            f"[TEST ISOLATION ERROR] Non-temporary SQLite database path '{resolved}' is prohibited when ENVIRONMENT=test."
+        )
 
 
 def build_engine(
@@ -90,6 +120,8 @@ def build_engine(
 
     # Explicit local development / isolated testing SQLite engine (only when DATABASE_URL is unset or sqlite://)
     sqlite_target = norm_url if (norm_url and norm_url.startswith("sqlite")) else SQLITE_URL
+    if target_env == "test":
+        _validate_test_sqlite_target(sqlite_target)
     return create_engine(
         sqlite_target,
         connect_args={"check_same_thread": False},
