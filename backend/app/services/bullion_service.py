@@ -25,6 +25,7 @@ from app.services.data_service import (
     get_market_trading_status,
     TROY_OUNCE_GRAMS,
 )
+from app.services.kjpl.live_rate_service import live_city_cache, is_non_persistent_city_feed
 
 IST = ZoneInfo("Asia/Kolkata")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -215,6 +216,8 @@ def get_latest_city_rates(
     trading_status = get_market_trading_status()
     indian_mkt_status = trading_status.get("indian_physical_market")
 
+    result_items: list[dict[str, Any]] = []
+
     try:
         stmt = (
             select(BullionLatestRate, BullionProduct, BullionCity)
@@ -235,7 +238,7 @@ def get_latest_city_rates(
                 s.source_name: s.current_status
                 for s in db.execute(select(DataSourceStatus)).scalars().all()
             }
-            return [
+            result_items = [
                 _serialize_latest_rate(
                     rate_obj,
                     prod_obj,
@@ -254,16 +257,42 @@ def get_latest_city_rates(
         if own:
             db.close()
 
-    if ENVIRONMENT == "production":
-        return []
+    # Overlay / merge in-memory cached rates for the five non-persistent city feeds (IDs 48-52)
+    cached_cities = live_city_cache.get_all_rates()
+    if cached_cities:
+        cached_by_city = {c["city_code"]: c for c in cached_cities}
+        seen_cities: set[str] = set()
+        merged_items: list[dict[str, Any]] = []
+        for item in result_items:
+            c_code = item["city_code"]
+            p_id = item["product_id"]
+            sp_id = str(item.get("source_product_id") or "")
+            if is_non_persistent_city_feed(sp_id, c_code, p_id) and c_code in cached_by_city:
+                merged_items.append(cached_by_city[c_code])
+                seen_cities.add(c_code)
+            else:
+                merged_items.append(item)
 
-    csv_rates = _read_latest_rates_from_csv()
-    if city_code:
-        norm = normalize_city_code(city_code)
-        csv_rates = [r for r in csv_rates if r["city_code"] == norm]
-    if metal:
-        csv_rates = [r for r in csv_rates if r["metal"] == metal.upper()]
-    return csv_rates
+        # Append any cached city not present in DB results
+        for c_code, cached_item in cached_by_city.items():
+            if c_code not in seen_cities:
+                match_city = (not city_code or normalize_city_code(city_code) == c_code)
+                match_metal = (not metal or metal.upper() == cached_item.get("metal", "GOLD"))
+                if match_city and match_metal:
+                    merged_items.append(cached_item)
+
+        result_items = merged_items
+
+    if not result_items and ENVIRONMENT != "production":
+        csv_rates = _read_latest_rates_from_csv()
+        if city_code:
+            norm = normalize_city_code(city_code)
+            csv_rates = [r for r in csv_rates if r["city_code"] == norm]
+        if metal:
+            csv_rates = [r for r in csv_rates if r["metal"] == metal.upper()]
+        return csv_rates
+
+    return result_items
 
 
 def get_city_comparison(all_rates: list[dict[str, Any]] | None = None, db: Session | None = None) -> dict[str, Any]:

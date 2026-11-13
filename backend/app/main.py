@@ -26,7 +26,7 @@ def _get_allowed_origins() -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Single-writer rule: FastAPI serves API & SSE streams only; never starts background scrapers (APScheduler removed).
+    # Single-writer rule: FastAPI serves API & SSE streams only; persistent DB writing scrapers are separate.
     if ENVIRONMENT != "production":
         init_database()
         try:
@@ -37,7 +37,26 @@ async def lifespan(app: FastAPI):
         db_health = check_database_health()
         if not db_health.get("connected"):
             raise RuntimeError(f"[LIFESPAN] Production database connection check failed: {db_health.get('error')}")
-    yield
+
+    # Own the five-city live collector and its in-memory cache
+    enable_collector_env = os.environ.get("ENABLE_FASTAPI_LIVE_COLLECTOR")
+    should_run_collector = (
+        enable_collector_env.lower() in ("1", "true", "yes")
+        if enable_collector_env is not None
+        else (ENVIRONMENT != "test")
+    )
+
+    collector = None
+    if should_run_collector:
+        from app.services.kjpl.live_rate_service import get_city_live_collector
+        collector = get_city_live_collector()
+        await collector.start()
+
+    try:
+        yield
+    finally:
+        if collector:
+            await collector.stop()
 
 
 app = FastAPI(
