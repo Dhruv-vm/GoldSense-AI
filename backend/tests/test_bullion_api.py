@@ -253,6 +253,8 @@ def test_five_independent_cities_api_and_timestamp_ist_conversion(monkeypatch):
 
 def test_production_mode_blocks_stale_csv_fallback_and_handles_market_closed(tmp_path: Path, monkeypatch):
     """In production with empty DB, API must never silently return local CSV rows; market closed retains valid rate."""
+    from app.services.kjpl.live_rate_service import live_city_cache
+    live_city_cache.clear()
     empty_db = tmp_path / "empty_prod.db"
     eng = create_engine(f"sqlite:///{empty_db}", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=eng)

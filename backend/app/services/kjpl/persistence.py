@@ -22,6 +22,7 @@ from app.models.bullion import (
 from app.services.kjpl.city_schemas import ParsedKJPLPayload, ParsedCityRate
 from app.services.kjpl.parser import parse_full_kjpl_datetime, resolve_clock_only_kjpl_timestamp
 from app.services.kjpl.validator import validate_bullion_observation
+from app.services.kjpl.live_rate_service import is_non_persistent_city_feed, live_city_cache
 
 IST = ZoneInfo("Asia/Kolkata")
 # Never set source_published_at > observed_at for any VALID MJDTA observation (A3-FINAL-4).
@@ -194,6 +195,21 @@ def persist_parsed_payload(
         # 1. Log any items already quarantined by parser
         for q_rate in payload.quarantined_rates:
             quarantined_count += 1
+            if is_non_persistent_city_feed(q_rate.source_product_id, q_rate.city_code, q_rate.product_id, q_rate.source_name):
+                # Strict 5-city non-persistence boundary: do not write to DB
+                item_logs.append({
+                    "source_product_id": q_rate.source_product_id or q_rate.product_id,
+                    "city": q_rate.city_code,
+                    "product_id": q_rate.product_id,
+                    "raw_value": q_rate.price,
+                    "raw_unit": q_rate.unit,
+                    "normalized_value": q_rate.normalized_price_per_gram,
+                    "normalized_unit": "INR/g" if q_rate.currency == "INR" else f"{q_rate.currency}/{q_rate.unit}",
+                    "validation_status": "QUARANTINED",
+                    "persistence_result": f"QUARANTINED_NON_PERSISTENT: {q_rate.quarantine_reason or 'Validation rejected'}",
+                })
+                continue
+
             item_logs.append({
                 "source_product_id": q_rate.source_product_id or q_rate.product_id,
                 "city": q_rate.city_code,
@@ -241,6 +257,85 @@ def persist_parsed_payload(
         )
 
         for rate in payload.city_rates:
+            # Strict five-city non-persistence boundary: IDs 48..52 update in-memory cache ONLY
+            if is_non_persistent_city_feed(rate.source_product_id, rate.city_code, rate.product_id, rate.source_name):
+                outcome = validate_bullion_observation(
+                    product_id=rate.product_id,
+                    metal=rate.metal,
+                    currency=rate.currency,
+                    unit=rate.unit,
+                    weight_value=rate.weight,
+                    price=rate.price,
+                    source_product_id=rate.source_product_id,
+                    previous_valid_per_gram=None,
+                )
+                ts_quarantine_reason: str | None = None
+                if source_pub_utc is not None and source_pub_utc > now_utc + MJDTA_FUTURE_TOLERANCE:
+                    ts_quarantine_reason = (
+                        f"Future source_published_at ({source_pub_utc.isoformat()}) "
+                        f"exceeds observed_at ({now_utc.isoformat()})"
+                    )
+                elif raw_src_time and source_pub_utc is None and (
+                    source_key in ("KJPL_LIVE", "KJPL_LIVE_WS")
+                    or payload.pipeline in ("KJPL_LIVE", "KJPL_LIVE_WS", "KJPL_TXT")
+                ):
+                    ts_quarantine_reason = (
+                        f"Invalid or ambiguous KJPL Type-4 source timestamp ({raw_src_time}); "
+                        f"refusing fallback to observed_at"
+                    )
+
+                if outcome.validation_status in ("QUARANTINED", "INVALIDATED") or ts_quarantine_reason is not None:
+                    quarantined_count += 1
+                    reason = outcome.reason or ts_quarantine_reason or "Validation rejected"
+                    item_logs.append({
+                        "source_product_id": rate.source_product_id or rate.product_id,
+                        "city": rate.city_code,
+                        "product_id": rate.product_id,
+                        "raw_value": rate.price,
+                        "raw_unit": rate.unit,
+                        "normalized_value": outcome.normalized_price_per_gram,
+                        "normalized_unit": "INR/g" if rate.currency == "INR" else f"{rate.currency}/{rate.unit}",
+                        "validation_status": "QUARANTINED",
+                        "persistence_result": f"QUARANTINED_NON_PERSISTENT: {reason}",
+                    })
+                    continue
+
+                # Valid city rate: update short-lived in-memory cache ONLY
+                _, price_changed = live_city_cache.update_rate(
+                    rate.city_code,
+                    price=float(rate.price),
+                    buy_price=float(rate.buy_price) if rate.buy_price is not None else None,
+                    source_product_id=rate.source_product_id,
+                    product_id=rate.product_id,
+                    product_name=rate.product_name,
+                    metal=rate.metal,
+                    purity=float(rate.purity),
+                    weight=float(rate.weight),
+                    product_weight_grams=float(outcome.product_weight_grams or 1.0),
+                    unit=rate.unit,
+                    rate_type=rate.rate_type,
+                    currency=rate.currency,
+                    source_published_at=source_pub_utc,
+                    source_updated_time=raw_src_time,
+                    observed_at=now_utc,
+                    validation_status="VALID",
+                    source_url=source_url,
+                )
+                if price_changed:
+                    changed_count += 1
+                item_logs.append({
+                    "source_product_id": rate.source_product_id or rate.product_id,
+                    "city": rate.city_code,
+                    "product_id": rate.product_id,
+                    "raw_value": float(rate.price),
+                    "raw_unit": rate.unit,
+                    "normalized_value": float(outcome.normalized_price_per_gram) if outcome.normalized_price_per_gram is not None else float(rate.price),
+                    "normalized_unit": "INR/g",
+                    "validation_status": "VALID",
+                    "persistence_result": "IN_MEMORY_CACHE_NON_PERSISTENT",
+                })
+                continue
+
             # NEW-2 / A3-FINAL-4: MJDTA benchmarks must carry a verified, non-future source publication timestamp.
             mjdta_reason: str | None = None
             quarantined_prec = norm_prec_label

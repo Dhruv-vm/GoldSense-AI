@@ -6,6 +6,7 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
+import pytest
 
 from alembic import command
 from alembic.config import Config
@@ -58,3 +59,11 @@ def _cleanup_temp_db() -> None:
 
 
 atexit.register(_cleanup_temp_db)
+
+
+@pytest.fixture(autouse=True)
+def reset_live_city_cache():
+    from app.services.kjpl.live_rate_service import live_city_cache
+    live_city_cache.clear()
+    yield
+    live_city_cache.clear()
